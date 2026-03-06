@@ -45,6 +45,12 @@ export const account = sqliteTable("account", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+export const imageThumbnailCache = sqliteTable("image_thumbnail_cache", {
+  fileId: text("file_id").primaryKey(),
+  base64: text("base64").notNull(),
+  generatedAt: integer("generated_at", { mode: "timestamp" }).notNull(),
+});
+
 export const verification = sqliteTable("verification", {
   id: text().primaryKey(),
   identifier: text().notNull(),

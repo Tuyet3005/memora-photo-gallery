@@ -15,6 +15,13 @@
       "when": 1772775092509,
       "tag": "0001_magenta_silvermane",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1772786838740,
+      "tag": "0002_handy_leech",
+      "breakpoints": true
     }
   ]
 }
