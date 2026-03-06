@@ -1,0 +1,1 @@
+- Always format and lint the code using Biome after any changes.
