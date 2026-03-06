@@ -80,24 +80,36 @@ async function handler({ request }: { request: Request }) {
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    const stream = Readable.from(buffer);
+    const parent = row.folderId ?? "root";
 
-    const res = await drive.files.create({
-      requestBody: {
-        name: row.fileName,
-        parents: [row.folderId ?? "root"],
-      },
-      media: {
-        mimeType: row.mimeType,
-        body: stream,
-      },
-      fields: "id,name,mimeType",
+    // Check if a file with the same name already exists in the target folder
+    const existing = await drive.files.list({
+      q: `'${parent}' in parents and name = '${row.fileName.replace(/'/g, "\\'")}' and trashed = false`,
+      fields: "files(id)",
+      pageSize: 1,
     });
+    const existingId = existing.data.files?.[0]?.id;
+
+    const resData = existingId
+      ? (
+          await drive.files.update({
+            fileId: existingId,
+            media: { mimeType: row.mimeType, body: Readable.from(buffer) },
+            fields: "id,name,mimeType",
+          })
+        ).data
+      : (
+          await drive.files.create({
+            requestBody: { name: row.fileName, parents: [parent] },
+            media: { mimeType: row.mimeType, body: Readable.from(buffer) },
+            fields: "id,name,mimeType",
+          })
+        ).data;
 
     await db.delete(signedUpload).where(eq(signedUpload.id, uploadId));
 
     return Response.json(
-      { fileId: res.data.id, name: res.data.name, mimeType: res.data.mimeType },
+      { fileId: resData.id, name: resData.name, mimeType: resData.mimeType },
       { status: 200 },
     );
   } catch (error) {

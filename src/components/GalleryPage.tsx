@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Folder, Upload } from "lucide-react";
+import { CheckCircle2, Folder, Loader2, Upload, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "#/components/ui/avatar";
 import {
   Breadcrumb,
@@ -12,6 +11,12 @@ import {
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
 import { Button } from "#/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "#/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -27,6 +32,14 @@ import {
 } from "#/components/ui/tooltip";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
+
+type FileUploadStatus = "pending" | "done" | "error";
+
+interface FileUploadEntry {
+  name: string;
+  status: FileUploadStatus;
+  error?: string;
+}
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
@@ -101,7 +114,8 @@ export function GalleryPage() {
 
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadPending, setUploadPending] = useState(false);
+  const [uploadEntries, setUploadEntries] = useState<FileUploadEntry[]>([]);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedDelegationId, setSelectedDelegationId] = useState<
     string | null
   >(null);
@@ -130,12 +144,9 @@ export function GalleryPage() {
     setFolderStack((prev) => [...prev, { id, name }]);
   }
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const uploading = uploadEntries.some((e) => e.status === "pending");
 
-    setUploadPending(true);
-
+  async function uploadOne(file: File): Promise<void> {
     try {
       const { uploadId } = await generateUploadUrl.mutateAsync({
         fileName: file.name,
@@ -157,15 +168,36 @@ export function GalleryPage() {
         throw new Error(body?.error ?? `Upload failed (${res.status})`);
       }
 
-      await queryClient.invalidateQueries(
-        trpc.drive.listFiles.queryOptions({ folderId: currentFolder?.id }),
+      setUploadEntries((prev) =>
+        prev.map((e) => (e.name === file.name ? { ...e, status: "done" } : e)),
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setUploadPending(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      setUploadEntries((prev) =>
+        prev.map((e) =>
+          e.name === file.name ? { ...e, status: "error", error: msg } : e,
+        ),
+      );
     }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    const entries: FileUploadEntry[] = files.map((f) => ({
+      name: f.name,
+      status: "pending",
+    }));
+    setUploadEntries(entries);
+    setUploadDialogOpen(true);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    await Promise.all(files.map(uploadOne));
+
+    await queryClient.invalidateQueries(
+      trpc.drive.listFiles.queryOptions({ folderId: currentFolder?.id }),
+    );
   }
 
   return (
@@ -174,9 +206,57 @@ export function GalleryPage() {
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
         onChange={handleFileChange}
       />
+
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent
+          className="max-w-sm"
+          onInteractOutside={(e) => uploading && e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {uploading ? "Uploading…" : "Upload complete"}
+            </DialogTitle>
+          </DialogHeader>
+          {uploading && (
+            <p className="text-muted-foreground text-sm sm:hidden">
+              Please don't leave this page while uploading.
+            </p>
+          )}
+          <ul className="mt-1 space-y-2">
+            {uploadEntries.map((entry) => (
+              <li key={entry.name} className="flex items-start gap-2 text-sm">
+                {entry.status === "pending" && (
+                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                )}
+                {entry.status === "done" && (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                )}
+                {entry.status === "error" && (
+                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                )}
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{entry.name}</p>
+                  {entry.error && (
+                    <p className="text-red-500 text-xs">{entry.error}</p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          {!uploading && (
+            <Button
+              className="mt-2 w-full"
+              onClick={() => setUploadDialogOpen(false)}
+            >
+              Done
+            </Button>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <div className="flex items-center justify-between gap-4">
         <Breadcrumb>
@@ -279,12 +359,12 @@ export function GalleryPage() {
                   variant="outline"
                   size="sm"
                   disabled={
-                    uploadPending || (!!selectedDelegationId && !currentFolder)
+                    uploading || (!!selectedDelegationId && !currentFolder)
                   }
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload className="mr-2 h-4 w-4" />
-                  {uploadPending ? "Uploading…" : "Upload"}
+                  Upload
                 </Button>
               </span>
             </TooltipTrigger>
