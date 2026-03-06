@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Folder, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "#/components/ui/avatar";
 import {
   Breadcrumb,
@@ -82,18 +83,13 @@ export function GalleryPage() {
 
   const currentFolder = folderStack[folderStack.length - 1];
 
-  const {
-    data: files,
-    isPending,
-    error,
-  } = useQuery(
+  const { data: files, isPending } = useQuery(
     trpc.drive.listFiles.queryOptions({ folderId: currentFolder?.id }),
   );
 
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadPending, setUploadPending] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedDelegationId, setSelectedDelegationId] = useState<
     string | null
   >(null);
@@ -127,7 +123,6 @@ export function GalleryPage() {
     if (!file) return;
 
     setUploadPending(true);
-    setUploadError(null);
 
     try {
       const { uploadId } = await generateUploadUrl.mutateAsync({
@@ -154,7 +149,7 @@ export function GalleryPage() {
         trpc.drive.listFiles.queryOptions({ folderId: currentFolder?.id }),
       );
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed");
+      toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploadPending(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -283,18 +278,6 @@ export function GalleryPage() {
           </Button>
         </div>
       </div>
-
-      {uploadError && (
-        <p className="mt-3 text-sm text-red-500">
-          Upload failed: {uploadError}
-        </p>
-      )}
-
-      {error && (
-        <p className="mt-4 text-sm text-red-500">
-          Failed to load files: {error.message}
-        </p>
-      )}
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {isPending

@@ -1,7 +1,12 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { createTRPCClient, httpBatchStreamLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import type { ReactNode } from "react";
+import { toast } from "sonner";
 import superjson from "superjson";
 import { TRPCProvider } from "#/integrations/trpc/react";
 import type { TRPCRouter } from "#/integrations/trpc/router";
@@ -42,7 +47,17 @@ export function getContext() {
       queries: {
         refetchOnWindowFocus: false,
       },
+      mutations: {
+        onError: (error) => {
+          toast.error(error.message);
+        },
+      },
     },
+    queryCache: new QueryCache({
+      onError: (error: Error) => {
+        toast.error(error.message);
+      },
+    }),
   });
 
   const serverHelpers = createTRPCOptionsProxy({
