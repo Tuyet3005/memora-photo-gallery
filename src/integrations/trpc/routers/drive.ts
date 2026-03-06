@@ -55,8 +55,7 @@ export const driveRouter = createTRPCRouter({
       pageSize: 100,
       fields: "files(id,name,mimeType,modifiedTime)",
       orderBy: "folder,name",
-      // q: "'root' in parents and trashed = false and (mimeType = 'application/vnd.google-apps.folder' or mimeType contains 'image/')",
-      q: "trashed = false and (mimeType contains 'image/')",
+      q: "'root' in parents and trashed = false and (mimeType = 'application/vnd.google-apps.folder' or mimeType contains 'image/')",
     });
 
     return res.data.files ?? [];
