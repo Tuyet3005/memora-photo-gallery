@@ -29,6 +29,13 @@
       "when": 1772791580154,
       "tag": "0003_drop_image_thumbnail_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1772794515166,
+      "tag": "0004_volatile_talon",
+      "breakpoints": true
     }
   ]
 }

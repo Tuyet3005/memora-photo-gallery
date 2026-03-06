@@ -1,8 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { google } from "googleapis";
+import { z } from "zod";
 import { db } from "#/db/index";
-import { account } from "#/db/schema";
+import { account, signedUpload } from "#/db/schema";
 import { createTRPCRouter, protectedProcedure } from "../init";
 
 async function getAuthedDrive(userId: string) {
@@ -48,16 +49,42 @@ async function getAuthedDrive(userId: string) {
 }
 
 export const driveRouter = createTRPCRouter({
-  listFiles: protectedProcedure.query(async ({ ctx }) => {
-    const drive = await getAuthedDrive(ctx.session.user.id);
+  listFiles: protectedProcedure
+    .input(z.object({ folderId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const drive = await getAuthedDrive(ctx.session.user.id);
+      const parent = input?.folderId ?? "root";
 
-    const res = await drive.files.list({
-      pageSize: 100,
-      fields: "files(id,name,mimeType,modifiedTime)",
-      orderBy: "folder,name",
-      q: "'root' in parents and trashed = false and (mimeType = 'application/vnd.google-apps.folder' or mimeType contains 'image/')",
-    });
+      const res = await drive.files.list({
+        pageSize: 100,
+        fields: "files(id,name,mimeType,modifiedTime)",
+        orderBy: "folder,name",
+        q: `'${parent}' in parents and trashed = false and (mimeType = 'application/vnd.google-apps.folder' or mimeType contains 'image/')`,
+      });
 
-    return res.data.files ?? [];
-  }),
+      return res.data.files ?? [];
+    }),
+
+  generateUploadUrl: protectedProcedure
+    .input(
+      z.object({
+        fileName: z.string(),
+        mimeType: z.string(),
+        folderId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const id = crypto.randomUUID();
+      const now = new Date();
+      await db.insert(signedUpload).values({
+        id,
+        userId: ctx.session.user.id,
+        folderId: input.folderId ?? null,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+        createdAt: now,
+      });
+      return { uploadId: id };
+    }),
 });
