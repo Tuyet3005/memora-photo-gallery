@@ -6,13 +6,19 @@ const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 export function GalleryPage() {
   const trpc = useTRPC();
-  const { data: files, isPending, error } = useQuery(trpc.drive.listFiles.queryOptions());
+  const {
+    data: files,
+    isPending,
+    error,
+  } = useQuery(trpc.drive.listFiles.queryOptions());
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
       <h1 className="text-3xl font-bold text-(--sea-ink)">Your gallery</h1>
 
-      {isPending && <p className="mt-4 text-sm text-(--sea-ink-soft)">Loading files…</p>}
+      {isPending && (
+        <p className="mt-4 text-sm text-(--sea-ink-soft)">Loading files…</p>
+      )}
 
       {error && (
         <p className="mt-4 text-sm text-red-500">
@@ -36,9 +42,12 @@ export function GalleryPage() {
                     src={`https://drive.google.com/thumbnail?id=${f.id}&sz=w200`}
                     alt={f.name ?? ""}
                     className="h-16 w-full rounded-md object-cover"
+                    referrerPolicy="no-referrer"
                   />
                 )}
-                <span className="w-full truncate text-xs text-(--sea-ink)">{f.name}</span>
+                <span className="w-full truncate text-xs text-(--sea-ink)">
+                  {f.name}
+                </span>
               </div>
             );
           })}
