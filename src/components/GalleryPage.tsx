@@ -20,6 +20,11 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { Skeleton } from "#/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "#/components/ui/tooltip";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 
@@ -267,22 +272,28 @@ export function GalleryPage() {
               </SelectContent>
             </Select>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={
-              uploadPending || (!!selectedDelegationId && !currentFolder)
-            }
-            title={
-              selectedDelegationId && !currentFolder
-                ? "Open a folder to upload with a delegated account"
-                : undefined
-            }
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            {uploadPending ? "Uploading…" : "Upload"}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    uploadPending || (!!selectedDelegationId && !currentFolder)
+                  }
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {uploadPending ? "Uploading…" : "Upload"}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {selectedDelegationId && !currentFolder && (
+              <TooltipContent>
+                You must upload to a folder when using delegation
+              </TooltipContent>
+            )}
+          </Tooltip>
         </div>
       </div>
 
