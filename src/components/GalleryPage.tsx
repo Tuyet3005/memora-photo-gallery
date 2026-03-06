@@ -26,8 +26,13 @@ import { authClient } from "#/lib/auth-client";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 function ThumbnailImage({ fileId, name }: { fileId: string; name: string }) {
+  const [fullStarted, setFullStarted] = useState(false);
   const [fullLoaded, setFullLoaded] = useState(false);
   const [lowLoaded, setLowLoaded] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => setFullStarted(true), 100); // Start loading the full image after a short delay
+  }, []);
 
   return (
     <div className="relative h-16 w-full overflow-hidden rounded-md">
@@ -43,13 +48,15 @@ function ThumbnailImage({ fileId, name }: { fileId: string; name: string }) {
           onLoad={() => setLowLoaded(true)}
         />
       )}
-      <img
-        src={`https://drive.google.com/thumbnail?id=${fileId}&sz=w200`}
-        alt={name}
-        className={`h-full w-full object-cover transition-opacity duration-300 ${fullLoaded ? "opacity-100" : "opacity-0"}`}
-        referrerPolicy="no-referrer"
-        onLoad={() => setFullLoaded(true)}
-      />
+      {fullStarted && (
+        <img
+          src={`https://drive.google.com/thumbnail?id=${fileId}&sz=w200`}
+          alt={name}
+          className={`h-full w-full object-cover transition-opacity duration-300 ${fullLoaded ? "opacity-100" : "opacity-0"}`}
+          referrerPolicy="no-referrer"
+          onLoad={() => setFullLoaded(true)}
+        />
+      )}
     </div>
   );
 }
