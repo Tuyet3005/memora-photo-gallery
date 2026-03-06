@@ -72,7 +72,7 @@ function ThumbnailImage({
         <img
           src={lh3Src(thumbnailLink, 20)}
           alt={name}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${lowLoaded ? "opacity-100" : "opacity-0"}`}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 blur-xs ${lowLoaded ? "opacity-100" : "opacity-0"}`}
           referrerPolicy="no-referrer"
           onLoad={() => setLowLoaded(true)}
         />
