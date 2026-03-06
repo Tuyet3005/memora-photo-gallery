@@ -12,6 +12,16 @@ function handler({ request }: { request: Request }) {
       session: await auth.api.getSession({ headers: request.headers }),
       request,
     }),
+    onError: ({ path, error, input }) => {
+      if (error.code !== "UNAUTHORIZED") {
+        console.error(
+          `[tRPC] ${path ?? "unknown"}:\n` + //
+            `Input: ${JSON.stringify(input)}\n` +
+            `Error:`,
+          error,
+        );
+      }
+    },
   });
 }
 

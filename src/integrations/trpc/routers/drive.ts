@@ -89,10 +89,10 @@ export const driveRouter = createTRPCRouter({
         const delegation = await db
           .select({
             grantorId: uploadDelegation.grantorId,
-            granteeEmail: user.email,
+            grantorEmail: user.email,
           })
           .from(uploadDelegation)
-          .innerJoin(user, eq(user.id, uploadDelegation.granteeId))
+          .innerJoin(user, eq(user.id, uploadDelegation.grantorId))
           .where(
             and(
               eq(uploadDelegation.id, input.uploadDelegationId),
@@ -114,13 +114,13 @@ export const driveRouter = createTRPCRouter({
         // Share the target folder with the grantee so they can access uploaded files.
         // Root cannot be shared via the API, so only share when a specific folder is set.
         if (input.folderId) {
-          const drive = await getAuthedDrive(delegation.grantorId);
+          const drive = await getAuthedDrive(ctx.session.user.id);
           await drive.permissions.create({
             fileId: input.folderId,
             requestBody: {
               type: "user",
               role: "writer",
-              emailAddress: delegation.granteeEmail,
+              emailAddress: delegation.grantorEmail,
             },
             sendNotificationEmail: false,
           });
