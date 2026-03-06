@@ -43,7 +43,18 @@ interface FileUploadEntry {
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
-function ThumbnailImage({ fileId, name }: { fileId: string; name: string }) {
+// Drive's thumbnailLink ends with =s<size>; replace that to resize.
+function lh3Src(thumbnailLink: string, size: number) {
+  return thumbnailLink.replace(/=s\d+$/, `=s${size}`);
+}
+
+function ThumbnailImage({
+  thumbnailLink,
+  name,
+}: {
+  thumbnailLink: string;
+  name: string;
+}) {
   const [fullStarted, setFullStarted] = useState(false);
   const [fullLoaded, setFullLoaded] = useState(false);
   const [lowLoaded, setLowLoaded] = useState(false);
@@ -59,7 +70,7 @@ function ThumbnailImage({ fileId, name }: { fileId: string; name: string }) {
       )}
       {!fullLoaded && (
         <img
-          src={`https://drive.google.com/thumbnail?id=${fileId}&sz=w10`}
+          src={lh3Src(thumbnailLink, 20)}
           alt={name}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${lowLoaded ? "opacity-100" : "opacity-0"}`}
           referrerPolicy="no-referrer"
@@ -68,11 +79,11 @@ function ThumbnailImage({ fileId, name }: { fileId: string; name: string }) {
       )}
       {fullStarted && (
         <img
-          src={`https://drive.google.com/thumbnail?id=${fileId}&sz=w200`}
+          src={lh3Src(thumbnailLink, 400)}
           alt={name}
-          className={`h-full w-full object-cover transition-opacity duration-300 ${fullLoaded ? "opacity-100" : "opacity-0"}`}
+          className={`h-full w-full object-cover ${fullLoaded ? "opacity-100" : "opacity-0"}`}
           referrerPolicy="no-referrer"
-          onLoad={() => setFullLoaded(true)}
+          onLoad={() => setTimeout(() => setFullLoaded(true), 300)}
         />
       )}
     </div>
@@ -410,7 +421,12 @@ export function GalleryPage() {
                   key={f.id}
                   className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center"
                 >
-                  <ThumbnailImage fileId={f.id ?? ""} name={f.name ?? ""} />
+                  {f.thumbnailLink && (
+                    <ThumbnailImage
+                      thumbnailLink={f.thumbnailLink}
+                      name={f.name ?? ""}
+                    />
+                  )}
                   <span className="w-full truncate text-xs text-(--sea-ink)">
                     {f.name}
                   </span>
