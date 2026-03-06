@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Folder, Loader2, Upload, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  Folder,
+  Loader2,
+  Upload,
+  Video,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "#/components/ui/avatar";
 import {
@@ -51,9 +58,11 @@ function lh3Src(thumbnailLink: string, size: number) {
 function ThumbnailImage({
   thumbnailLink,
   name,
+  mimeType,
 }: {
   thumbnailLink: string;
   name: string;
+  mimeType: string;
 }) {
   const [fullStarted, setFullStarted] = useState(false);
   const [fullLoaded, setFullLoaded] = useState(false);
@@ -65,6 +74,11 @@ function ThumbnailImage({
 
   return (
     <div className="relative h-16 w-full overflow-hidden rounded-md">
+      {mimeType.startsWith("video/") && (
+        <div className="absolute top-1 right-1 z-10 rounded-sm bg-black/70 p-0.5">
+          <Video className="size-4 text-white" />
+        </div>
+      )}
       {!lowLoaded && !fullLoaded && (
         <Skeleton className="absolute inset-0 h-full w-full" />
       )}
@@ -243,7 +257,7 @@ export function GalleryPage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         multiple
         className="hidden"
         onChange={handleFileChange}
@@ -457,6 +471,7 @@ export function GalleryPage() {
                     <ThumbnailImage
                       thumbnailLink={f.thumbnailLink}
                       name={f.name ?? ""}
+                      mimeType={f.mimeType ?? ""}
                     />
                   )}
                   <span className="w-full truncate text-xs text-(--sea-ink)">
