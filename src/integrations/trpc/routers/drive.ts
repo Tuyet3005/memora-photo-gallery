@@ -5,7 +5,7 @@ import { db } from "#/db/index";
 import { account } from "#/db/schema";
 import { createTRPCRouter, protectedProcedure } from "../init";
 
-async function getGoogleAccount(userId: string) {
+async function getAuthedDrive(userId: string) {
   const [googleAccount] = await db
     .select()
     .from(account)
@@ -18,20 +18,38 @@ async function getGoogleAccount(userId: string) {
       message: "No Google access token found. Please sign in again.",
     });
   }
-  return googleAccount;
+
+  const oauth2 = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+  );
+
+  oauth2.setCredentials({
+    access_token: googleAccount.accessToken,
+    refresh_token: googleAccount.refreshToken ?? undefined,
+    expiry_date: googleAccount.accessTokenExpiresAt?.getTime() ?? undefined,
+  });
+
+  // Persist refreshed tokens back to DB
+  oauth2.on("tokens", async (tokens) => {
+    await db
+      .update(account)
+      .set({
+        accessToken: tokens.access_token ?? googleAccount.accessToken,
+        ...(tokens.refresh_token && { refreshToken: tokens.refresh_token }),
+        ...(tokens.expiry_date && {
+          accessTokenExpiresAt: new Date(tokens.expiry_date),
+        }),
+      })
+      .where(eq(account.id, googleAccount.id));
+  });
+
+  return google.drive({ version: "v3", auth: oauth2 });
 }
 
 export const driveRouter = createTRPCRouter({
   listFiles: protectedProcedure.query(async ({ ctx }) => {
-    const googleAccount = await getGoogleAccount(ctx.session.user.id);
-
-    const oauth2 = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-    );
-    oauth2.setCredentials({ access_token: googleAccount.accessToken });
-
-    const drive = google.drive({ version: "v3", auth: oauth2 });
+    const drive = await getAuthedDrive(ctx.session.user.id);
 
     const res = await drive.files.list({
       pageSize: 100,
