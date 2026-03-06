@@ -4,8 +4,6 @@ import { authClient } from "#/lib/auth-client";
 export const Route = createFileRoute("/signin")({ component: SignIn });
 
 function SignIn() {
-  const router = useRouter();
-
   async function handleGoogleSignIn() {
     await authClient.signIn.social({
       provider: "google",
