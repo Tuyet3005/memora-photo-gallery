@@ -1,17 +1,18 @@
 import { TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { google } from "googleapis";
 import { z } from "zod";
 import { db } from "#/db/index";
-import { account, signedUpload } from "#/db/schema";
+import { account, signedUpload, uploadDelegation, user } from "#/db/schema";
 import { createTRPCRouter, protectedProcedure } from "../init";
 
 async function getAuthedDrive(userId: string) {
-  const [googleAccount] = await db
+  const googleAccount = await db
     .select()
     .from(account)
     .where(eq(account.userId, userId))
-    .limit(1);
+    .limit(1)
+    .get();
 
   if (!googleAccount?.accessToken) {
     throw new TRPCError({
@@ -71,14 +72,66 @@ export const driveRouter = createTRPCRouter({
         fileName: z.string(),
         mimeType: z.string(),
         folderId: z.string().optional(),
+        uploadDelegationId: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      if (input.uploadDelegationId && !input.folderId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Delegation can only be used when uploading to a folder",
+        });
+      }
+
+      let effectiveUserId = ctx.session.user.id;
+
+      if (input.uploadDelegationId) {
+        const delegation = await db
+          .select({
+            grantorId: uploadDelegation.grantorId,
+            granteeEmail: user.email,
+          })
+          .from(uploadDelegation)
+          .innerJoin(user, eq(user.id, uploadDelegation.granteeId))
+          .where(
+            and(
+              eq(uploadDelegation.id, input.uploadDelegationId),
+              eq(uploadDelegation.granteeId, ctx.session.user.id),
+            ),
+          )
+          .limit(1)
+          .get();
+
+        if (!delegation) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Delegation not found or not authorized",
+          });
+        }
+
+        effectiveUserId = delegation.grantorId;
+
+        // Share the target folder with the grantee so they can access uploaded files.
+        // Root cannot be shared via the API, so only share when a specific folder is set.
+        if (input.folderId) {
+          const drive = await getAuthedDrive(delegation.grantorId);
+          await drive.permissions.create({
+            fileId: input.folderId,
+            requestBody: {
+              type: "user",
+              role: "writer",
+              emailAddress: delegation.granteeEmail,
+            },
+            sendNotificationEmail: false,
+          });
+        }
+      }
+
       const id = crypto.randomUUID();
       const now = new Date();
       await db.insert(signedUpload).values({
         id,
-        userId: ctx.session.user.id,
+        userId: effectiveUserId,
         folderId: input.folderId ?? null,
         fileName: input.fileName,
         mimeType: input.mimeType,

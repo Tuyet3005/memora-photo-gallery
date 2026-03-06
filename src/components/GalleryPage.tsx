@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Folder, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "#/components/ui/avatar";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,8 +11,16 @@ import {
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
 import { Button } from "#/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "#/components/ui/select";
 import { Skeleton } from "#/components/ui/skeleton";
 import { useTRPC } from "#/integrations/trpc/react";
+import { authClient } from "#/lib/auth-client";
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
@@ -44,8 +53,29 @@ function ThumbnailImage({ fileId, name }: { fileId: string; name: string }) {
   );
 }
 
+function AccountOption({
+  image,
+  name,
+}: {
+  image: string | null | undefined;
+  name: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <Avatar className="h-5 w-5 shrink-0">
+        <AvatarImage src={image ?? undefined} alt="" />
+        <AvatarFallback className="text-[10px]">
+          {name.charAt(0).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <span className="truncate">{name}</span>
+    </div>
+  );
+}
+
 export function GalleryPage() {
   const trpc = useTRPC();
+  const { data: session } = authClient.useSession();
   const [folderStack, setFolderStack] = useState<
     { id: string; name: string }[]
   >([]);
@@ -64,6 +94,25 @@ export function GalleryPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadPending, setUploadPending] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [selectedDelegationId, setSelectedDelegationId] = useState<
+    string | null
+  >(null);
+  const [delegationInitialized, setDelegationInitialized] = useState(false);
+
+  const { data: grantorData } = useQuery(
+    trpc.user.listMyGrantors.queryOptions(),
+  );
+
+  useEffect(() => {
+    if (grantorData && !delegationInitialized) {
+      setSelectedDelegationId(grantorData.selectedDelegationId ?? null);
+      setDelegationInitialized(true);
+    }
+  }, [grantorData, delegationInitialized]);
+
+  const setPreference = useMutation(
+    trpc.user.setUploadDelegationPreference.mutationOptions(),
+  );
 
   const generateUploadUrl = useMutation(
     trpc.drive.generateUploadUrl.mutationOptions(),
@@ -85,6 +134,7 @@ export function GalleryPage() {
         fileName: file.name,
         mimeType: file.type,
         folderId: currentFolder?.id,
+        uploadDelegationId: selectedDelegationId ?? undefined,
       });
 
       const form = new FormData();
@@ -165,15 +215,73 @@ export function GalleryPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={uploadPending}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload className="mr-2 h-4 w-4" />
-          {uploadPending ? "Uploading…" : "Upload"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {grantorData && grantorData.grantors.length > 0 && (
+            <Select
+              value={selectedDelegationId ?? "me"}
+              onValueChange={(val) => {
+                const newId = val === "me" ? null : val;
+                setSelectedDelegationId(newId);
+                setPreference.mutate({ delegationId: newId });
+              }}
+            >
+              <SelectTrigger size="sm" className="w-44">
+                {selectedDelegationId === null ? (
+                  <AccountOption
+                    image={session?.user.image}
+                    name={session?.user.name ?? "Me"}
+                  />
+                ) : (
+                  (() => {
+                    const g = grantorData.grantors.find(
+                      (x) => x.delegationId === selectedDelegationId,
+                    );
+                    return g ? (
+                      <AccountOption
+                        image={g.grantorImage}
+                        name={g.grantorName}
+                      />
+                    ) : (
+                      <SelectValue placeholder="Upload as…" />
+                    );
+                  })()
+                )}
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectItem value="me">
+                  <AccountOption
+                    image={session?.user.image}
+                    name={session?.user.name ?? "Me"}
+                  />
+                </SelectItem>
+                {grantorData.grantors.map((g) => (
+                  <SelectItem key={g.delegationId} value={g.delegationId}>
+                    <AccountOption
+                      image={g.grantorImage}
+                      name={g.grantorName}
+                    />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={
+              uploadPending || (!!selectedDelegationId && !currentFolder)
+            }
+            title={
+              selectedDelegationId && !currentFolder
+                ? "Open a folder to upload with a delegated account"
+                : undefined
+            }
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            {uploadPending ? "Uploading…" : "Upload"}
+          </Button>
+        </div>
       </div>
 
       {uploadError && (

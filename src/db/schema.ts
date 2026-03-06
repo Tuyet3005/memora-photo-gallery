@@ -8,6 +8,7 @@ export const user = sqliteTable("user", {
   image: text(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  uploadDelegationId: text("upload_delegation_id"),
 });
 
 export const session = sqliteTable("session", {
@@ -63,5 +64,16 @@ export const signedUpload = sqliteTable("signed_upload", {
   fileName: text("file_name").notNull(),
   mimeType: text("mime_type").notNull(),
   expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});
+
+export const uploadDelegation = sqliteTable("upload_delegation", {
+  id: text().primaryKey(),
+  grantorId: text("grantor_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  granteeId: text("grantee_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });

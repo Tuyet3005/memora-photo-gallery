@@ -14,11 +14,12 @@ async function handler({ request }: { request: Request }) {
   }
 
   const now = new Date();
-  const [row] = await db
+  const row = await db
     .select()
     .from(signedUpload)
     .where(and(eq(signedUpload.id, uploadId), gt(signedUpload.expiresAt, now)))
-    .limit(1);
+    .limit(1)
+    .get();
 
   if (!row) {
     return Response.json(
@@ -39,11 +40,12 @@ async function handler({ request }: { request: Request }) {
     return Response.json({ error: "Missing file field" }, { status: 400 });
   }
 
-  const [googleAccount] = await db
+  const googleAccount = await db
     .select()
     .from(account)
     .where(eq(account.userId, row.userId))
-    .limit(1);
+    .limit(1)
+    .get();
 
   if (!googleAccount?.accessToken) {
     return Response.json(
