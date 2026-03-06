@@ -1,2 +1,3 @@
 - Always format and lint the code using Biome after any changes.
 - Try to utilize shadcn/ui components when possible, add new components from the shadcn/ui library if needed. Only create custom components when necessary.
+- For icons, try to use lucide-react icons first, if an icon is not available there, then use Radix UI icons. Only create custom icons as a last resort.
