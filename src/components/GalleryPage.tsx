@@ -33,7 +33,7 @@ import {
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 
-type FileUploadStatus = "pending" | "done" | "error";
+type FileUploadStatus = "pending" | "retrying" | "done" | "error";
 
 interface FileUploadEntry {
   name: string;
@@ -155,41 +155,68 @@ export function GalleryPage() {
     setFolderStack((prev) => [...prev, { id, name }]);
   }
 
-  const uploading = uploadEntries.some((e) => e.status === "pending");
+  const uploading = uploadEntries.some(
+    (e) => e.status === "pending" || e.status === "retrying",
+  );
 
   async function uploadOne(file: File): Promise<void> {
-    try {
-      const { uploadId } = await generateUploadUrl.mutateAsync({
-        fileName: file.name,
-        mimeType: file.type,
-        folderId: currentFolder?.id,
-        uploadDelegationId: selectedDelegationId ?? undefined,
-      });
+    const MAX_ATTEMPTS = 3;
+    let lastError = "Upload failed";
 
-      const form = new FormData();
-      form.append("file", file);
-
-      const res = await fetch(`/api/upload/${uploadId}`, {
-        method: "POST",
-        body: form,
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? `Upload failed (${res.status})`);
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      if (attempt > 1) {
+        setUploadEntries((prev) =>
+          prev.map((e) =>
+            e.name === file.name
+              ? {
+                  ...e,
+                  status: "retrying",
+                  error: `Retrying (${attempt}/${MAX_ATTEMPTS})…`,
+                }
+              : e,
+          ),
+        );
       }
 
-      setUploadEntries((prev) =>
-        prev.map((e) => (e.name === file.name ? { ...e, status: "done" } : e)),
-      );
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Upload failed";
-      setUploadEntries((prev) =>
-        prev.map((e) =>
-          e.name === file.name ? { ...e, status: "error", error: msg } : e,
-        ),
-      );
+      try {
+        const { uploadId } = await generateUploadUrl.mutateAsync({
+          fileName: file.name,
+          mimeType: file.type,
+          folderId: currentFolder?.id,
+          uploadDelegationId: selectedDelegationId ?? undefined,
+        });
+
+        const form = new FormData();
+        form.append("file", file);
+
+        const res = await fetch(`/api/upload/${uploadId}`, {
+          method: "POST",
+          body: form,
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body?.error ?? `Upload failed (${res.status})`);
+        }
+
+        setUploadEntries((prev) =>
+          prev.map((e) =>
+            e.name === file.name
+              ? { ...e, status: "done", error: undefined }
+              : e,
+          ),
+        );
+        return;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : "Upload failed";
+      }
     }
+
+    setUploadEntries((prev) =>
+      prev.map((e) =>
+        e.name === file.name ? { ...e, status: "error", error: lastError } : e,
+      ),
+    );
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -240,7 +267,8 @@ export function GalleryPage() {
           <ul className="mt-1 space-y-2">
             {uploadEntries.map((entry) => (
               <li key={entry.name} className="flex items-start gap-2 text-sm">
-                {entry.status === "pending" && (
+                {(entry.status === "pending" ||
+                  entry.status === "retrying") && (
                   <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
                 )}
                 {entry.status === "done" && (
@@ -252,7 +280,11 @@ export function GalleryPage() {
                 <div className="min-w-0">
                   <p className="truncate font-medium">{entry.name}</p>
                   {entry.error && (
-                    <p className="text-red-500 text-xs">{entry.error}</p>
+                    <p
+                      className={`text-xs ${entry.status === "retrying" ? "text-muted-foreground" : "text-red-500"}`}
+                    >
+                      {entry.error}
+                    </p>
                   )}
                 </div>
               </li>
