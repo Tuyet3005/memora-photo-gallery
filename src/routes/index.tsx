@@ -1,57 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Folder } from "lucide-react";
+import { GalleryPage } from "#/components/GalleryPage";
 import { Button } from "#/components/ui/button";
-import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 
-const FOLDER_MIME = "application/vnd.google-apps.folder";
-
 export const Route = createFileRoute("/")({ component: IndexPage });
-
-function GalleryPage() {
-  const trpc = useTRPC();
-  const { data: files, isPending, error } = useQuery(trpc.drive.listFiles.queryOptions());
-
-  return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-(--sea-ink)">Your gallery</h1>
-
-      {isPending && <p className="mt-4 text-sm text-(--sea-ink-soft)">Loading files…</p>}
-
-      {error && (
-        <p className="mt-4 text-sm text-red-500">
-          Failed to load files: {error.message}
-        </p>
-      )}
-
-      {files && (
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {files.map((f) => {
-            const isFolder = f.mimeType === FOLDER_MIME;
-            return (
-              <div
-                key={f.id}
-                className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center"
-              >
-                {isFolder ? (
-                  <Folder className="h-16 w-16 text-(--lagoon-deep)" />
-                ) : (
-                  <img
-                    src={`https://drive.google.com/thumbnail?id=${f.id}&sz=w200`}
-                    alt={f.name ?? ""}
-                    className="h-16 w-full rounded-md object-cover"
-                  />
-                )}
-                <span className="w-full truncate text-xs text-(--sea-ink)">{f.name}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </main>
-  );
-}
 
 function IndexPage() {
   const { data: session, isPending } = authClient.useSession();
@@ -71,12 +23,12 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="group relative flex flex-col gap-3 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-[var(--chip-line)]">
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--sand)] text-[var(--lagoon-deep)]">
+    <div className="group relative flex flex-col gap-3 rounded-2xl border border-(--line) bg-(--surface) p-6 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-(--chip-line) hover:shadow-md">
+      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-(--sand) text-(--lagoon-deep)">
         {icon}
       </div>
-      <h3 className="text-base font-semibold text-[var(--sea-ink)]">{title}</h3>
-      <p className="text-sm leading-relaxed text-[var(--sea-ink-soft)]">
+      <h3 className="text-base font-semibold text-(--sea-ink)">{title}</h3>
+      <p className="text-sm leading-relaxed text-(--sea-ink-soft)">
         {description}
       </p>
     </div>
@@ -85,28 +37,28 @@ function FeatureCard({
 
 function LandingPage() {
   return (
-    <main className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-[var(--bg-base)]">
+    <main className="relative min-h-[calc(100vh-64px)] overflow-hidden bg-(--bg-base)">
       {/* Ambient background blobs */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 overflow-hidden"
       >
-        <div className="absolute -top-32 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-[var(--hero-a)] blur-[96px]" />
-        <div className="absolute top-60 -right-24 h-[380px] w-[380px] rounded-full bg-[var(--hero-b)] blur-[80px]" />
-        <div className="absolute bottom-0 left-0 h-[320px] w-[320px] rounded-full bg-[var(--hero-a)] opacity-50 blur-[80px]" />
+        <div className="absolute -top-32 left-1/2 h-130 w-130 -translate-x-1/2 rounded-full bg-(--hero-a) blur-[96px]" />
+        <div className="absolute -right-24 top-60 h-95 w-95 rounded-full bg-(--hero-b) blur-[80px]" />
+        <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-(--hero-a) opacity-50 blur-[80px]" />
       </div>
 
       {/* Hero */}
       <section className="relative mx-auto flex max-w-4xl flex-col items-center px-6 pb-24 pt-24 text-center sm:pt-32">
         {/* Kicker */}
-        <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-[var(--kicker)] shadow-sm backdrop-blur-sm">
-          <span className="h-1.5 w-1.5 rounded-full bg-[var(--lagoon)]" />
+        <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-(--chip-line) bg-(--chip-bg) px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-(--kicker) shadow-sm backdrop-blur-sm">
+          <span className="h-1.5 w-1.5 rounded-full bg-(--lagoon)" />
           Your memories, beautifully preserved
         </span>
 
         {/* Heading */}
         <h1
-          className="mb-6 text-5xl font-bold leading-[1.1] tracking-tight text-[var(--sea-ink)] sm:text-6xl lg:text-7xl"
+          className="mb-6 text-5xl font-bold leading-[1.1] tracking-tight text-(--sea-ink) sm:text-6xl lg:text-7xl"
           style={{ fontFamily: "'Fraunces', serif" }}
         >
           A gallery for every{" "}
@@ -126,7 +78,7 @@ function LandingPage() {
         </h1>
 
         {/* Sub-heading */}
-        <p className="mb-10 max-w-2xl text-lg leading-relaxed text-[var(--sea-ink-soft)] sm:text-xl">
+        <p className="mb-10 max-w-2xl text-lg leading-relaxed text-(--sea-ink-soft) sm:text-xl">
           Memora lets you organise, revisit, and share your photo memories in a
           clean, private gallery — no algorithms, no noise, just your story.
         </p>
@@ -148,7 +100,7 @@ function LandingPage() {
           <Button
             variant="outline"
             size="lg"
-            className="rounded-full border-[var(--chip-line)] bg-[var(--chip-bg)] px-8 text-base font-semibold text-[var(--sea-ink)] backdrop-blur-sm transition-all hover:-translate-y-0.5"
+            className="rounded-full border-(--chip-line) bg-(--chip-bg) px-8 text-base font-semibold text-(--sea-ink) backdrop-blur-sm transition-all hover:-translate-y-0.5"
             asChild
           >
             <Link to="/signin">Sign in</Link>
@@ -156,7 +108,7 @@ function LandingPage() {
         </div>
 
         {/* Social proof hint */}
-        <p className="mt-8 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mt-8 text-sm text-(--sea-ink-soft)">
           Private by default &middot; No ads &middot; Always yours
         </p>
       </section>
@@ -291,14 +243,14 @@ function LandingPage() {
 
       {/* Bottom CTA banner */}
       <section className="relative mx-auto max-w-3xl px-6 pb-32">
-        <div className="flex flex-col items-center gap-6 rounded-3xl border border-[var(--line)] bg-[var(--surface-strong)] px-8 py-14 text-center shadow-lg backdrop-blur-md">
+        <div className="flex flex-col items-center gap-6 rounded-3xl border border-(--line) bg-(--surface-strong) px-8 py-14 text-center shadow-lg backdrop-blur-md">
           <h2
-            className="text-3xl font-bold text-[var(--sea-ink)] sm:text-4xl"
+            className="text-3xl font-bold text-(--sea-ink) sm:text-4xl"
             style={{ fontFamily: "'Fraunces', serif" }}
           >
             Start building your gallery today.
           </h2>
-          <p className="max-w-md text-[var(--sea-ink-soft)]">
+          <p className="max-w-md text-(--sea-ink-soft)">
             Free to join. No credit card required. Your first memories are just
             a click away.
           </p>
