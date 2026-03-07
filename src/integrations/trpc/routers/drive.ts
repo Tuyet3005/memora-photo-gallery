@@ -81,8 +81,7 @@ export const driveRouter = createTRPCRouter({
 
       const res = await drive.files.list({
         pageSize: 100,
-        fields:
-          "files(id,name,mimeType,createdTime,modifiedTime,size,imageMediaMetadata(width,height,time,cameraMake,cameraModel,location(latitude,longitude)),videoMediaMetadata(width,height,durationMillis),thumbnailLink)",
+        fields: "files(id,name,mimeType,thumbnailLink)",
         orderBy: "folder,name",
         q: `'${parent}' in parents and trashed = false and (mimeType = 'application/vnd.google-apps.folder' or mimeType contains 'image/' or mimeType contains 'video/')`,
       });

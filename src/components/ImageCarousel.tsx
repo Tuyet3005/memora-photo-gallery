@@ -91,6 +91,10 @@ export function ImageCarousel({
 }: {
   files: inferRouterOutputs<typeof driveRouter>["listFiles"];
 }) {
+  const photoFiles = files.filter((file) =>
+    file.mimeType?.startsWith("image/"),
+  );
+
   const [api, setApi] = useState<CarouselApi>();
   const [thumbnailApi, setThumbnailApi] = useState<CarouselApi>();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -106,6 +110,10 @@ export function ImageCarousel({
     });
   }, [thumbnailApi, api]);
 
+  if (photoFiles.length === 0) {
+    return null;
+  }
+
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: Intended for keyboard navigation
     <div
@@ -118,8 +126,8 @@ export function ImageCarousel({
       }}
     >
       <Carousel setApi={setApi} opts={{ duration: 20 }}>
-        <CarouselContent className="max-h-[60vh]">
-          {files
+        <CarouselContent className="h-[60vh]">
+          {photoFiles
             .filter((file) => file.thumbnailLink)
             .map((file, i) => (
               <CarouselItem key={file.id}>
@@ -141,7 +149,7 @@ export function ImageCarousel({
         opts={{ containScroll: false, dragFree: true }}
       >
         <CarouselContent className="h-24 mt-4 py-1">
-          {files
+          {photoFiles
             .filter((file) => file.thumbnailLink)
             .map((file, i) => (
               <CarouselItem

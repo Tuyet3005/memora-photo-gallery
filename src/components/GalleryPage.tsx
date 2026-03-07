@@ -3,10 +3,8 @@ import {
   CheckCircle2,
   Folder,
   Home,
-  Info,
   Loader2,
   Upload,
-  Video,
   XCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -33,7 +31,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
-import { Skeleton } from "#/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -41,7 +38,6 @@ import {
 } from "#/components/ui/tooltip";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
-import { hasHoverSupport, parseExifDate } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
 
 type FileUploadStatus = "pending" | "retrying" | "done" | "error";
@@ -53,195 +49,6 @@ interface FileUploadEntry {
 }
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
-
-// Drive's thumbnailLink ends with =s<size>; replace that to resize.
-function lh3Src(thumbnailLink: string, size: number) {
-  return thumbnailLink.replace(/=s\d+$/, `=s${size}`);
-}
-
-function ThumbnailImage({
-  thumbnailLink,
-  name,
-  mimeType,
-}: {
-  thumbnailLink: string;
-  name: string;
-  mimeType: string;
-}) {
-  const [fullStarted, setFullStarted] = useState(false);
-  const [fullLoaded, setFullLoaded] = useState(false);
-  const [lowLoaded, setLowLoaded] = useState(false);
-
-  useEffect(() => {
-    setTimeout(() => setFullStarted(true), 100); // Start loading the full image after a short delay
-  }, []);
-
-  return (
-    <div className="relative h-16 w-full overflow-hidden rounded-md">
-      {mimeType.startsWith("video/") && (
-        <div className="absolute top-1 right-1 z-10 rounded-sm bg-black/70 p-0.5">
-          <Video className="size-4 text-white" />
-        </div>
-      )}
-      {!lowLoaded && !fullLoaded && (
-        <Skeleton className="absolute inset-0 h-full w-full" />
-      )}
-      {!fullLoaded && (
-        <img
-          src={lh3Src(thumbnailLink, 20)}
-          alt={name}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 blur-xs ${lowLoaded ? "opacity-100" : "opacity-0"}`}
-          referrerPolicy="no-referrer"
-          onLoad={() => setLowLoaded(true)}
-        />
-      )}
-      {fullStarted && (
-        <img
-          src={lh3Src(thumbnailLink, 400)}
-          alt={name}
-          className={`h-full w-full object-cover ${fullLoaded ? "opacity-100" : "opacity-0"}`}
-          referrerPolicy="no-referrer"
-          onLoad={() => setTimeout(() => setFullLoaded(true), 300)}
-        />
-      )}
-    </div>
-  );
-}
-
-function formatBytes(bytes: string | null | undefined): string | null {
-  const n = Number(bytes);
-  if (!bytes || !n) return null;
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
-  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
-
-function formatDuration(ms: string | null | undefined): string | null {
-  const n = Number(ms);
-  if (!ms || !n) return null;
-  const s = Math.floor(n / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0)
-    return `${h}:${String(m % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-  return `${m}:${String(s % 60).padStart(2, "0")}`;
-}
-
-type FileMeta = {
-  mimeType?: string | null;
-  createdTime?: string | null;
-  modifiedTime?: string | null;
-  size?: string | null;
-  imageMediaMetadata?: {
-    width?: number | null;
-    height?: number | null;
-    time?: string | null;
-    cameraMake?: string | null;
-    cameraModel?: string | null;
-    location?: { latitude?: number | null; longitude?: number | null } | null;
-  } | null;
-  videoMediaMetadata?: {
-    width?: number | null;
-    height?: number | null;
-    durationMillis?: string | null;
-  } | null;
-};
-
-function buildFileMetaRows(file: FileMeta): { label: string; value: string }[] {
-  const img = file.imageMediaMetadata;
-  const vid = file.videoMediaMetadata;
-  const rows: { label: string; value: string }[] = [];
-
-  if (img?.time)
-    rows.push({
-      label: "Taken",
-      value: parseExifDate(img.time).toLocaleString(),
-    });
-  if (file.createdTime)
-    rows.push({
-      label: "Created",
-      value: new Date(file.createdTime).toLocaleString(),
-    });
-  if (file.modifiedTime)
-    rows.push({
-      label: "Modified",
-      value: new Date(file.modifiedTime).toLocaleString(),
-    });
-  if (file.size)
-    rows.push({ label: "Size", value: formatBytes(file.size) ?? "" });
-
-  const imgW = img?.width;
-  const imgH = img?.height;
-  if (imgW && imgH)
-    rows.push({ label: "Dimensions", value: `${imgW} × ${imgH}` });
-
-  const vidW = vid?.width;
-  const vidH = vid?.height;
-  if (vidW && vidH)
-    rows.push({ label: "Dimensions", value: `${vidW} × ${vidH}` });
-
-  const duration = formatDuration(vid?.durationMillis);
-  if (duration) rows.push({ label: "Duration", value: duration });
-
-  const camera = [img?.cameraMake, img?.cameraModel].filter(Boolean).join(" ");
-  if (camera) rows.push({ label: "Camera", value: camera });
-
-  const lat = img?.location?.latitude;
-  const lng = img?.location?.longitude;
-  if (lat != null && lng != null)
-    rows.push({
-      label: "Location",
-      value: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-    });
-
-  return rows;
-}
-
-function FileMetaTooltipContent({
-  rows,
-}: {
-  rows: { label: string; value: string }[];
-}) {
-  return (
-    <TooltipContent side="top" className="p-2">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs">
-        {rows.map((r) => (
-          <>
-            <dt key={`${r.label}-dt`} className="text-muted-foreground">
-              {r.label}
-            </dt>
-            <dd
-              key={`${r.label}-dd`}
-              className="whitespace-nowrap text-right font-medium"
-            >
-              {r.value}
-            </dd>
-          </>
-        ))}
-      </dl>
-    </TooltipContent>
-  );
-}
-
-function FileMetaTooltip({
-  file,
-  children,
-}: {
-  file: FileMeta;
-  children: React.ReactNode;
-}) {
-  const rows = buildFileMetaRows(file);
-
-  if (rows.length === 0) return <>{children}</>;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <FileMetaTooltipContent rows={rows} />
-    </Tooltip>
-  );
-}
 
 function AccountOption({
   image,
@@ -425,7 +232,7 @@ export function GalleryPage() {
     await Promise.all(files.map(uploadOne));
 
     await queryClient.invalidateQueries(
-      trpc.drive.listFiles.queryOptions({ folderId: currentFolder?.id }),
+      trpc.drive.listFiles.queryOptions({ folderId: currentFolderId }),
     );
   }
 
@@ -639,75 +446,37 @@ export function GalleryPage() {
           </Tooltip>
         </div>
       </div>
-      <ImageCarousel files={files ?? []} />
+
+      <div className="mt-6">
+        <ImageCarousel files={files ?? []} />
+      </div>
+
+      {isPending && (
+        <div className="flex justify-center py-12">
+          <img src="/loading.gif" alt="Loading…" className="w-[60%] max-w-52" />
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {isPending
-          ? Array.from({ length: 10 }, (_, i) => `skeleton-${i}`).map((key) => (
-              <div
-                key={key}
-                className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3"
+        {!isPending &&
+          files?.map((f) => {
+            const isFolder = f.mimeType === FOLDER_MIME;
+            if (!isFolder) return null;
+
+            return (
+              <button
+                key={f.id}
+                type="button"
+                className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center cursor-pointer hover:bg-(--surface-hover) w-full"
+                onClick={() => openFolder(f.id ?? "", f.name ?? "")}
               >
-                <Skeleton className="h-16 w-full rounded-md" />
-                <Skeleton className="h-3 w-3/4 rounded" />
-              </div>
-            ))
-          : files?.map((f) => {
-              const isFolder = f.mimeType === FOLDER_MIME;
-              if (isFolder) {
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center cursor-pointer hover:bg-(--surface-hover) w-full"
-                    onClick={() => openFolder(f.id ?? "", f.name ?? "")}
-                  >
-                    <Folder className="h-16 w-16 text-(--lagoon-deep)" />
-                    <span className="w-full truncate text-xs text-(--sea-ink)">
-                      {f.name}
-                    </span>
-                  </button>
-                );
-              }
-
-              const content = (
-                <div
-                  key={f.id}
-                  className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center"
-                >
-                  {f.thumbnailLink && (
-                    <ThumbnailImage
-                      thumbnailLink={f.thumbnailLink}
-                      name={f.name ?? ""}
-                      mimeType={f.mimeType ?? ""}
-                    />
-                  )}
-                  <div className="flex w-full items-center justify-between gap-1">
-                    <span className="w-full truncate text-xs text-(--sea-ink)">
-                      {f.name}
-                    </span>
-                    {!hasHoverSupport() && (
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="size-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <FileMetaTooltipContent rows={buildFileMetaRows(f)} />
-                      </Tooltip>
-                    )}
-                  </div>
-                </div>
-              );
-
-              if (hasHoverSupport()) {
-                return (
-                  <FileMetaTooltip key={f.id} file={f}>
-                    {content}
-                  </FileMetaTooltip>
-                );
-              }
-
-              return content;
-            })}
+                <Folder className="h-16 w-16 text-(--lagoon-deep)" />
+                <span className="w-full truncate text-xs text-(--sea-ink)">
+                  {f.name}
+                </span>
+              </button>
+            );
+          })}
       </div>
     </main>
   );
