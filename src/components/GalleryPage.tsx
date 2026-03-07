@@ -202,7 +202,7 @@ function FileMetaTooltipContent({
   rows: { label: string; value: string }[];
 }) {
   return (
-    <TooltipContent side="bottom" className="p-2">
+    <TooltipContent side="top" className="p-2">
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs">
         {rows.map((r) => (
           <>
