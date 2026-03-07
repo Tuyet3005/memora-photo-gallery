@@ -263,18 +263,23 @@ function AccountOption({
   );
 }
 
+const YOUR_GALLERY = { id: "", name: "Your gallery" };
+
 export function GalleryPage() {
   const trpc = useTRPC();
   const { data: session } = authClient.useSession();
+  // folderStack always has YOUR_GALLERY as index 0
   const [folderStack, setFolderStack] = useState<
     { id: string; name: string }[]
-  >([]);
+  >([YOUR_GALLERY]);
   const [folderStackInitialized, setFolderStackInitialized] = useState(false);
 
   const currentFolder = folderStack[folderStack.length - 1];
+  // Pass undefined for root (empty id = Your gallery)
+  const currentFolderId = currentFolder.id || undefined;
 
   const { data: files, isPending } = useQuery({
-    ...trpc.drive.listFiles.queryOptions({ folderId: currentFolder?.id }),
+    ...trpc.drive.listFiles.queryOptions({ folderId: currentFolderId }),
     enabled: folderStackInitialized,
   });
 
@@ -309,9 +314,14 @@ export function GalleryPage() {
     if (preferences.homeFolderId && !homeFolderPath) return; // wait for path
     setFolderStackInitialized(true);
     if (homeFolderPath) {
-      setFolderStack(homeFolderPath);
+      setFolderStack([YOUR_GALLERY, ...homeFolderPath]);
     }
   }, [preferences, homeFolderPath, folderStackInitialized]);
+
+  // visibleStack: everything from the first "Memora" entry onward, otherwise full stack
+  const memoraIdx = folderStack.findIndex((f) => f.name === "Memora");
+  const visibleStack =
+    memoraIdx !== -1 ? folderStack.slice(memoraIdx) : folderStack;
 
   const setHomeFolderPreference = useMutation(
     trpc.user.setHomeFolderPreference.mutationOptions(),
@@ -363,7 +373,7 @@ export function GalleryPage() {
         const { uploadId } = await generateUploadUrl.mutateAsync({
           fileName: file.name,
           mimeType: file.type,
-          folderId: currentFolder?.id,
+          folderId: currentFolderId,
           uploadDelegationId: selectedDelegationId ?? undefined,
         });
 
@@ -485,62 +495,19 @@ export function GalleryPage() {
       <div className="flex items-center justify-between gap-4">
         <Breadcrumb>
           <BreadcrumbList>
-            <BreadcrumbItem className="flex items-center gap-1">
-              {folderStack.length === 0 ? (
-                <BreadcrumbPage className="text-3xl font-bold text-(--sea-ink)">
-                  Your gallery
-                </BreadcrumbPage>
-              ) : (
-                <BreadcrumbLink
-                  className="cursor-pointer text-3xl font-bold"
-                  onClick={() => setFolderStack([])}
-                >
-                  Your gallery
-                </BreadcrumbLink>
-              )}
-              {preferences !== undefined && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="ml-1 rounded p-0.5 hover:bg-muted"
-                      onClick={() => {
-                        // Root is home when homeFolderId is null — clicking clears it (no-op concept: set to null again would keep it)
-                        // We don't support "root as explicit home"; clicking on root when it's already home does nothing useful.
-                        // So only allow setting root as home if a different folder is currently home.
-                        if (preferences.homeFolderId === null) return;
-                        setHomeFolderPreference.mutate(
-                          { folderId: null },
-                          {
-                            onSuccess: () =>
-                              queryClient.invalidateQueries(
-                                trpc.user.getPreferences.queryOptions(),
-                              ),
-                          },
-                        );
-                      }}
-                    >
-                      <Home
-                        className={`size-4 ${preferences.homeFolderId === null ? "text-(--lagoon-deep)" : "text-muted-foreground"}`}
-                      />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {preferences.homeFolderId === null
-                      ? "Currently showing root"
-                      : "Reset to root (clear home folder)"}
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </BreadcrumbItem>
-            {folderStack.map((folder, i) => {
-              const isLast = i === folderStack.length - 1;
-              const isHome = preferences?.homeFolderId === folder.id;
+            {visibleStack.map((folder, i) => {
+              const isLast = i === visibleStack.length - 1;
+              const isRoot = folder.id === "";
+              const isHome = isRoot
+                ? preferences?.homeFolderId === null
+                : preferences?.homeFolderId === folder.id;
+              // Find the real index in folderStack to slice correctly on navigate
+              const stackIdx = folderStack.indexOf(folder);
               return (
                 <>
-                  <BreadcrumbSeparator key={`sep-${folder.id}`} />
+                  {i > 0 && <BreadcrumbSeparator key={`sep-${stackIdx}`} />}
                   <BreadcrumbItem
-                    key={folder.id}
+                    key={`item-${stackIdx}`}
                     className="flex items-center gap-1"
                   >
                     {isLast ? (
@@ -551,38 +518,46 @@ export function GalleryPage() {
                       <BreadcrumbLink
                         className="cursor-pointer text-3xl font-bold"
                         onClick={() =>
-                          setFolderStack((prev) => prev.slice(0, i + 1))
+                          setFolderStack((prev) => prev.slice(0, stackIdx + 1))
                         }
                       >
                         {folder.name}
                       </BreadcrumbLink>
                     )}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="ml-1 rounded p-0.5 hover:bg-muted"
-                          onClick={() => {
-                            setHomeFolderPreference.mutate(
-                              { folderId: isHome ? null : folder.id },
-                              {
-                                onSuccess: () =>
-                                  queryClient.invalidateQueries(
-                                    trpc.user.getPreferences.queryOptions(),
-                                  ),
-                              },
-                            );
-                          }}
-                        >
-                          <Home
-                            className={`size-4 ${isHome ? "text-(--lagoon-deep)" : "text-muted-foreground"}`}
-                          />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {isHome ? "Clear home folder" : "Set as home folder"}
-                      </TooltipContent>
-                    </Tooltip>
+                    {preferences !== undefined && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="ml-1 rounded p-0.5 hover:bg-muted"
+                            onClick={() => {
+                              setHomeFolderPreference.mutate(
+                                {
+                                  folderId: isHome
+                                    ? null
+                                    : isRoot
+                                      ? null
+                                      : folder.id,
+                                },
+                                {
+                                  onSuccess: () =>
+                                    queryClient.invalidateQueries(
+                                      trpc.user.getPreferences.queryOptions(),
+                                    ),
+                                },
+                              );
+                            }}
+                          >
+                            <Home
+                              className={`size-4 ${isHome ? "text-(--lagoon-deep)" : "text-muted-foreground"}`}
+                            />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {isHome ? "Clear home folder" : "Set as home folder"}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </BreadcrumbItem>
                 </>
               );
@@ -647,7 +622,7 @@ export function GalleryPage() {
                   variant="outline"
                   size="sm"
                   disabled={
-                    uploading || (!!selectedDelegationId && !currentFolder)
+                    uploading || (!!selectedDelegationId && !currentFolderId)
                   }
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -656,7 +631,7 @@ export function GalleryPage() {
                 </Button>
               </span>
             </TooltipTrigger>
-            {selectedDelegationId && !currentFolder && (
+            {selectedDelegationId && !currentFolderId && (
               <TooltipContent>
                 You must upload to a folder when using delegation
               </TooltipContent>
