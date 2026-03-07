@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
   Folder,
+  Info,
   Loader2,
   Upload,
   Video,
@@ -39,7 +40,7 @@ import {
 } from "#/components/ui/tooltip";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
-import { parseExifDate } from "#/lib/utils";
+import { hasHoverSupport, parseExifDate } from "#/lib/utils";
 
 type FileUploadStatus = "pending" | "retrying" | "done" | "error";
 
@@ -125,34 +126,29 @@ function formatDuration(ms: string | null | undefined): string | null {
   return `${m}:${String(s % 60).padStart(2, "0")}`;
 }
 
-function FileMetaTooltip({
-  file,
-  children,
-}: {
-  file: {
-    mimeType?: string | null;
-    createdTime?: string | null;
-    modifiedTime?: string | null;
-    size?: string | null;
-    imageMediaMetadata?: {
-      width?: number | null;
-      height?: number | null;
-      time?: string | null;
-      cameraMake?: string | null;
-      cameraModel?: string | null;
-      location?: { latitude?: number | null; longitude?: number | null } | null;
-    } | null;
-    videoMediaMetadata?: {
-      width?: number | null;
-      height?: number | null;
-      durationMillis?: string | null;
-    } | null;
-  };
-  children: React.ReactNode;
-}) {
+type FileMeta = {
+  mimeType?: string | null;
+  createdTime?: string | null;
+  modifiedTime?: string | null;
+  size?: string | null;
+  imageMediaMetadata?: {
+    width?: number | null;
+    height?: number | null;
+    time?: string | null;
+    cameraMake?: string | null;
+    cameraModel?: string | null;
+    location?: { latitude?: number | null; longitude?: number | null } | null;
+  } | null;
+  videoMediaMetadata?: {
+    width?: number | null;
+    height?: number | null;
+    durationMillis?: string | null;
+  } | null;
+};
+
+function buildFileMetaRows(file: FileMeta): { label: string; value: string }[] {
   const img = file.imageMediaMetadata;
   const vid = file.videoMediaMetadata;
-
   const rows: { label: string; value: string }[] = [];
 
   if (img?.time)
@@ -197,28 +193,50 @@ function FileMetaTooltip({
       value: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
     });
 
+  return rows;
+}
+
+function FileMetaTooltipContent({
+  rows,
+}: {
+  rows: { label: string; value: string }[];
+}) {
+  return (
+    <TooltipContent side="bottom" className="p-2">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs">
+        {rows.map((r) => (
+          <>
+            <dt key={`${r.label}-dt`} className="text-muted-foreground">
+              {r.label}
+            </dt>
+            <dd
+              key={`${r.label}-dd`}
+              className="whitespace-nowrap text-right font-medium"
+            >
+              {r.value}
+            </dd>
+          </>
+        ))}
+      </dl>
+    </TooltipContent>
+  );
+}
+
+function FileMetaTooltip({
+  file,
+  children,
+}: {
+  file: FileMeta;
+  children: React.ReactNode;
+}) {
+  const rows = buildFileMetaRows(file);
+
   if (rows.length === 0) return <>{children}</>;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="bottom" className="p-2">
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs">
-          {rows.map((r) => (
-            <>
-              <dt key={`${r.label}-dt`} className="text-muted-foreground">
-                {r.label}
-              </dt>
-              <dd
-                key={`${r.label}-dd`}
-                className="whitespace-nowrap text-right font-medium"
-              >
-                {r.value}
-              </dd>
-            </>
-          ))}
-        </dl>
-      </TooltipContent>
+      <FileMetaTooltipContent rows={rows} />
     </Tooltip>
   );
 }
@@ -581,22 +599,44 @@ export function GalleryPage() {
                   </button>
                 );
               }
-              return (
-                <FileMetaTooltip key={f.id} file={f}>
-                  <div className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center">
-                    {f.thumbnailLink && (
-                      <ThumbnailImage
-                        thumbnailLink={f.thumbnailLink}
-                        name={f.name ?? ""}
-                        mimeType={f.mimeType ?? ""}
-                      />
-                    )}
+
+              const content = (
+                <div
+                  key={f.id}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center"
+                >
+                  {f.thumbnailLink && (
+                    <ThumbnailImage
+                      thumbnailLink={f.thumbnailLink}
+                      name={f.name ?? ""}
+                      mimeType={f.mimeType ?? ""}
+                    />
+                  )}
+                  <div className="flex w-full items-center justify-between gap-1">
                     <span className="w-full truncate text-xs text-(--sea-ink)">
                       {f.name}
                     </span>
+                    {!hasHoverSupport() && (
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="size-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <FileMetaTooltipContent rows={buildFileMetaRows(f)} />
+                      </Tooltip>
+                    )}
                   </div>
-                </FileMetaTooltip>
+                </div>
               );
+
+              if (hasHoverSupport()) {
+                return (
+                  <FileMetaTooltip key={f.id} file={f}>
+                    {content}
+                  </FileMetaTooltip>
+                );
+              }
+
+              return content;
             })}
       </div>
     </main>

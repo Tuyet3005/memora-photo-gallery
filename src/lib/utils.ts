@@ -11,3 +11,13 @@ export function parseExifDate(exif: string): Date {
   // Replace the first two colons (date separators) with dashes so Date can parse it
   return new Date(exif.replace(/^(\d{4}):(\d{2}):(\d{2})/, "$1-$2-$3"));
 }
+
+export function hasHoverSupport() {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia === "undefined"
+  ) {
+    return false;
+  }
+  return window.matchMedia("(hover: hover)").matches;
+}
