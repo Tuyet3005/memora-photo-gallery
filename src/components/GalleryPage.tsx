@@ -39,6 +39,7 @@ import {
 } from "#/components/ui/tooltip";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
+import { parseExifDate } from "#/lib/utils";
 
 type FileUploadStatus = "pending" | "retrying" | "done" | "error";
 
@@ -101,6 +102,124 @@ function ThumbnailImage({
         />
       )}
     </div>
+  );
+}
+
+function formatBytes(bytes: string | null | undefined): string | null {
+  const n = Number(bytes);
+  if (!bytes || !n) return null;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
+function formatDuration(ms: string | null | undefined): string | null {
+  const n = Number(ms);
+  if (!ms || !n) return null;
+  const s = Math.floor(n / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0)
+    return `${h}:${String(m % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  return `${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function FileMetaTooltip({
+  file,
+  children,
+}: {
+  file: {
+    mimeType?: string | null;
+    createdTime?: string | null;
+    modifiedTime?: string | null;
+    size?: string | null;
+    imageMediaMetadata?: {
+      width?: number | null;
+      height?: number | null;
+      time?: string | null;
+      cameraMake?: string | null;
+      cameraModel?: string | null;
+      location?: { latitude?: number | null; longitude?: number | null } | null;
+    } | null;
+    videoMediaMetadata?: {
+      width?: number | null;
+      height?: number | null;
+      durationMillis?: string | null;
+    } | null;
+  };
+  children: React.ReactNode;
+}) {
+  const img = file.imageMediaMetadata;
+  const vid = file.videoMediaMetadata;
+
+  const rows: { label: string; value: string }[] = [];
+
+  if (img?.time)
+    rows.push({
+      label: "Taken",
+      value: parseExifDate(img.time).toLocaleString(),
+    });
+  if (file.createdTime)
+    rows.push({
+      label: "Created",
+      value: new Date(file.createdTime).toLocaleString(),
+    });
+  if (file.modifiedTime)
+    rows.push({
+      label: "Modified",
+      value: new Date(file.modifiedTime).toLocaleString(),
+    });
+  if (file.size)
+    rows.push({ label: "Size", value: formatBytes(file.size) ?? "" });
+
+  const imgW = img?.width;
+  const imgH = img?.height;
+  if (imgW && imgH)
+    rows.push({ label: "Dimensions", value: `${imgW} × ${imgH}` });
+
+  const vidW = vid?.width;
+  const vidH = vid?.height;
+  if (vidW && vidH)
+    rows.push({ label: "Dimensions", value: `${vidW} × ${vidH}` });
+
+  const duration = formatDuration(vid?.durationMillis);
+  if (duration) rows.push({ label: "Duration", value: duration });
+
+  const camera = [img?.cameraMake, img?.cameraModel].filter(Boolean).join(" ");
+  if (camera) rows.push({ label: "Camera", value: camera });
+
+  const lat = img?.location?.latitude;
+  const lng = img?.location?.longitude;
+  if (lat != null && lng != null)
+    rows.push({
+      label: "Location",
+      value: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+    });
+
+  if (rows.length === 0) return <>{children}</>;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="bottom" className="p-2">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-xs">
+          {rows.map((r) => (
+            <>
+              <dt key={`${r.label}-dt`} className="text-muted-foreground">
+                {r.label}
+              </dt>
+              <dd
+                key={`${r.label}-dd`}
+                className="whitespace-nowrap text-right font-medium"
+              >
+                {r.value}
+              </dd>
+            </>
+          ))}
+        </dl>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -463,21 +582,20 @@ export function GalleryPage() {
                 );
               }
               return (
-                <div
-                  key={f.id}
-                  className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center"
-                >
-                  {f.thumbnailLink && (
-                    <ThumbnailImage
-                      thumbnailLink={f.thumbnailLink}
-                      name={f.name ?? ""}
-                      mimeType={f.mimeType ?? ""}
-                    />
-                  )}
-                  <span className="w-full truncate text-xs text-(--sea-ink)">
-                    {f.name}
-                  </span>
-                </div>
+                <FileMetaTooltip key={f.id} file={f}>
+                  <div className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center">
+                    {f.thumbnailLink && (
+                      <ThumbnailImage
+                        thumbnailLink={f.thumbnailLink}
+                        name={f.name ?? ""}
+                        mimeType={f.mimeType ?? ""}
+                      />
+                    )}
+                    <span className="w-full truncate text-xs text-(--sea-ink)">
+                      {f.name}
+                    </span>
+                  </div>
+                </FileMetaTooltip>
               );
             })}
       </div>
