@@ -41,6 +41,7 @@ import {
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { hasHoverSupport, parseExifDate } from "#/lib/utils";
+import { ImageCarousel } from "./ImageCarousel";
 
 type FileUploadStatus = "pending" | "retrying" | "done" | "error";
 
@@ -570,6 +571,7 @@ export function GalleryPage() {
           </Tooltip>
         </div>
       </div>
+      <ImageCarousel files={files ?? []} />
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {isPending

@@ -33,5 +33,6 @@
   "[css]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
-  "git.branchProtectionPrompt": "alwaysCommit"
+  "git.branchProtectionPrompt": "alwaysCommit",
+  "editor.indentSize": 2
 }
