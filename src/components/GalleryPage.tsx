@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
   Folder,
+  Home,
   Info,
   Loader2,
   Upload,
@@ -268,12 +269,14 @@ export function GalleryPage() {
   const [folderStack, setFolderStack] = useState<
     { id: string; name: string }[]
   >([]);
+  const [folderStackInitialized, setFolderStackInitialized] = useState(false);
 
   const currentFolder = folderStack[folderStack.length - 1];
 
-  const { data: files, isPending } = useQuery(
-    trpc.drive.listFiles.queryOptions({ folderId: currentFolder?.id }),
-  );
+  const { data: files, isPending } = useQuery({
+    ...trpc.drive.listFiles.queryOptions({ folderId: currentFolder?.id }),
+    enabled: folderStackInitialized,
+  });
 
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -284,8 +287,34 @@ export function GalleryPage() {
   >(null);
   const [delegationInitialized, setDelegationInitialized] = useState(false);
 
+  const { data: preferences } = useQuery(
+    trpc.user.getPreferences.queryOptions(),
+  );
+
   const { data: grantorData } = useQuery(
     trpc.user.listMyGrantors.queryOptions(),
+  );
+
+  const { data: homeFolderPath } = useQuery({
+    ...trpc.drive.getFolderPath.queryOptions({
+      folderId: preferences?.homeFolderId ?? "",
+    }),
+    enabled: !!preferences?.homeFolderId,
+  });
+
+  // Initialize folderStack from home folder on first load
+  useEffect(() => {
+    if (folderStackInitialized) return;
+    if (!preferences) return;
+    if (preferences.homeFolderId && !homeFolderPath) return; // wait for path
+    setFolderStackInitialized(true);
+    if (homeFolderPath) {
+      setFolderStack(homeFolderPath);
+    }
+  }, [preferences, homeFolderPath, folderStackInitialized]);
+
+  const setHomeFolderPreference = useMutation(
+    trpc.user.setHomeFolderPreference.mutationOptions(),
   );
 
   useEffect(() => {
@@ -456,7 +485,7 @@ export function GalleryPage() {
       <div className="flex items-center justify-between gap-4">
         <Breadcrumb>
           <BreadcrumbList>
-            <BreadcrumbItem>
+            <BreadcrumbItem className="flex items-center gap-1">
               {folderStack.length === 0 ? (
                 <BreadcrumbPage className="text-3xl font-bold text-(--sea-ink)">
                   Your gallery
@@ -469,13 +498,51 @@ export function GalleryPage() {
                   Your gallery
                 </BreadcrumbLink>
               )}
+              {preferences !== undefined && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="ml-1 rounded p-0.5 hover:bg-muted"
+                      onClick={() => {
+                        // Root is home when homeFolderId is null — clicking clears it (no-op concept: set to null again would keep it)
+                        // We don't support "root as explicit home"; clicking on root when it's already home does nothing useful.
+                        // So only allow setting root as home if a different folder is currently home.
+                        if (preferences.homeFolderId === null) return;
+                        setHomeFolderPreference.mutate(
+                          { folderId: null },
+                          {
+                            onSuccess: () =>
+                              queryClient.invalidateQueries(
+                                trpc.user.getPreferences.queryOptions(),
+                              ),
+                          },
+                        );
+                      }}
+                    >
+                      <Home
+                        className={`size-4 ${preferences.homeFolderId === null ? "text-(--lagoon-deep)" : "text-muted-foreground"}`}
+                      />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {preferences.homeFolderId === null
+                      ? "Currently showing root"
+                      : "Reset to root (clear home folder)"}
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </BreadcrumbItem>
             {folderStack.map((folder, i) => {
               const isLast = i === folderStack.length - 1;
+              const isHome = preferences?.homeFolderId === folder.id;
               return (
                 <>
                   <BreadcrumbSeparator key={`sep-${folder.id}`} />
-                  <BreadcrumbItem key={folder.id}>
+                  <BreadcrumbItem
+                    key={folder.id}
+                    className="flex items-center gap-1"
+                  >
                     {isLast ? (
                       <BreadcrumbPage className="text-3xl font-bold text-(--sea-ink)">
                         {folder.name}
@@ -490,6 +557,32 @@ export function GalleryPage() {
                         {folder.name}
                       </BreadcrumbLink>
                     )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="ml-1 rounded p-0.5 hover:bg-muted"
+                          onClick={() => {
+                            setHomeFolderPreference.mutate(
+                              { folderId: isHome ? null : folder.id },
+                              {
+                                onSuccess: () =>
+                                  queryClient.invalidateQueries(
+                                    trpc.user.getPreferences.queryOptions(),
+                                  ),
+                              },
+                            );
+                          }}
+                        >
+                          <Home
+                            className={`size-4 ${isHome ? "text-(--lagoon-deep)" : "text-muted-foreground"}`}
+                          />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {isHome ? "Clear home folder" : "Set as home folder"}
+                      </TooltipContent>
+                    </Tooltip>
                   </BreadcrumbItem>
                 </>
               );

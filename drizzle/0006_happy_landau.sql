@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD `home_folder_id` text;

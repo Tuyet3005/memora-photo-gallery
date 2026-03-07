@@ -6,6 +6,32 @@ import { uploadDelegation, user } from "#/db/schema";
 import { createTRPCRouter, protectedProcedure } from "../init";
 
 export const userRouter = createTRPCRouter({
+  getPreferences: protectedProcedure.query(async ({ ctx }) => {
+    const prefs = await db
+      .select({
+        homeFolderId: user.homeFolderId,
+        uploadDelegationId: user.uploadDelegationId,
+      })
+      .from(user)
+      .where(eq(user.id, ctx.session.user.id))
+      .limit(1)
+      .get();
+    return {
+      homeFolderId: prefs?.homeFolderId ?? null,
+      uploadDelegationId: prefs?.uploadDelegationId ?? null,
+    };
+  }),
+
+  setHomeFolderPreference: protectedProcedure
+    .input(z.object({ folderId: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .update(user)
+        .set({ homeFolderId: input.folderId })
+        .where(eq(user.id, ctx.session.user.id));
+      return { success: true };
+    }),
+
   findByEmail: protectedProcedure
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input }) => {

@@ -2,3 +2,4 @@
 - Try to utilize shadcn/ui components when possible, add new components from the shadcn/ui library if needed. Only create custom components when necessary.
 - For icons, try to use lucide-react icons first, if an icon is not available there, then use Radix UI icons. Only create custom icons as a last resort.
 - When doing database changes, always create a new migration file and run it to update the database schema. Do not modify existing migration files that have already been run in production. Use drizzle commands to do this after change to schema.ts, such as `drizzle generate` to create a new migration and `drizzle up` to apply it.
+- Always read allowed commands and try to use allowed commands if possible, or use tools (preferably approved previously), only run adhoc commands that's not allowed when absolutely necessary.

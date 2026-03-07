@@ -50,6 +50,29 @@ async function getAuthedDrive(userId: string) {
 }
 
 export const driveRouter = createTRPCRouter({
+  getFolderPath: protectedProcedure
+    .input(z.object({ folderId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const drive = await getAuthedDrive(ctx.session.user.id);
+      const path: { id: string; name: string }[] = [];
+      let currentId = input.folderId;
+
+      for (let i = 0; i < 20; i++) {
+        const res = await drive.files.get({
+          fileId: currentId,
+          fields: "id,name,parents",
+        });
+        const file = res.data;
+        if (!file.id || !file.name) break;
+        path.unshift({ id: file.id, name: file.name });
+        const parentId = file.parents?.[0];
+        if (!parentId) break;
+        currentId = parentId;
+      }
+
+      return path.slice(1); // Remove root
+    }),
+
   listFiles: protectedProcedure
     .input(z.object({ folderId: z.string().optional() }).optional())
     .query(async ({ ctx, input }) => {

@@ -9,6 +9,7 @@ export const user = sqliteTable("user", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
   uploadDelegationId: text("upload_delegation_id"),
+  homeFolderId: text("home_folder_id"),
 });
 
 export const session = sqliteTable("session", {
