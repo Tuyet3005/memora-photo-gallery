@@ -218,7 +218,10 @@ export function GalleryPage() {
           const url = `${window.location.origin}/share/${shareId}`;
           setShareLink(url);
           setShareDialogOpen(true);
-          setShareCopied(false);
+          navigator.clipboard.writeText(url).then(() => {
+            setShareCopied(true);
+            setTimeout(() => setShareCopied(false), 2000);
+          });
         },
       },
     );
