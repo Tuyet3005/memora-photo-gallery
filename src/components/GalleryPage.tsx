@@ -75,7 +75,7 @@ function AccountOption({
   );
 }
 
-const YOUR_GALLERY = { id: "", name: "Your gallery" };
+const YOUR_GALLERY = { id: "", name: "Memora" };
 
 export function GalleryPage() {
   const trpc = useTRPC();
