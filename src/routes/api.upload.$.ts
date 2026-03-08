@@ -1,9 +1,9 @@
 import { Readable } from "node:stream";
 import { createFileRoute } from "@tanstack/react-router";
 import { and, eq, gt } from "drizzle-orm";
-import { google } from "googleapis";
 import { db } from "#/db/index";
-import { account, signedUpload } from "#/db/schema";
+import { signedUpload } from "#/db/schema";
+import { getAuthedDrive } from "#/lib/drive";
 
 async function handler({ request }: { request: Request }) {
   const url = new URL(request.url);
@@ -40,43 +40,15 @@ async function handler({ request }: { request: Request }) {
     return Response.json({ error: "Missing file field" }, { status: 400 });
   }
 
-  const googleAccount = await db
-    .select()
-    .from(account)
-    .where(eq(account.userId, row.userId))
-    .limit(1)
-    .get();
-
-  if (!googleAccount?.accessToken) {
+  let drive: Awaited<ReturnType<typeof getAuthedDrive>>;
+  try {
+    drive = await getAuthedDrive(row.userId);
+  } catch {
     return Response.json(
       { error: "No Google access token. Please sign in again." },
       { status: 401 },
     );
   }
-
-  const oauth2 = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-  );
-  oauth2.setCredentials({
-    access_token: googleAccount.accessToken,
-    refresh_token: googleAccount.refreshToken ?? undefined,
-    expiry_date: googleAccount.accessTokenExpiresAt?.getTime() ?? undefined,
-  });
-  oauth2.on("tokens", async (tokens) => {
-    await db
-      .update(account)
-      .set({
-        accessToken: tokens.access_token ?? googleAccount.accessToken,
-        ...(tokens.refresh_token && { refreshToken: tokens.refresh_token }),
-        ...(tokens.expiry_date && {
-          accessTokenExpiresAt: new Date(tokens.expiry_date),
-        }),
-      })
-      .where(eq(account.id, googleAccount.id));
-  });
-
-  const drive = google.drive({ version: "v3", auth: oauth2 });
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
