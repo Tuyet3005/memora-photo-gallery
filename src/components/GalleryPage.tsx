@@ -45,6 +45,7 @@ import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { cn } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
+import { ThumbnailImage } from "./ThumbnailImage";
 
 type FileUploadStatus = "pending" | "retrying" | "done" | "error";
 
@@ -662,11 +663,11 @@ export function GalleryPage() {
             onClick={() => openFolder(f.id ?? "", f.name ?? "")}
           >
             {f.thumbnail ? (
-              <img
-                src={f.thumbnail.thumbnailLink}
-                alt={f.name ?? ""}
-                className="absolute inset-0 h-full w-full object-cover"
-                referrerPolicy="no-referrer"
+              <ThumbnailImage
+                thumbnailLink={f.thumbnail.thumbnailLink}
+                name={f.name ?? ""}
+                mimeType="image/"
+                fitType="cover"
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
