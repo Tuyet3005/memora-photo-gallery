@@ -96,3 +96,12 @@ export const uploadDelegation = sqliteTable("upload_delegation", {
     .references(() => user.id, { onDelete: "cascade" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
+
+export const folderShare = sqliteTable("folder_share", {
+  id: text().primaryKey(), // UUID used in the share link
+  folderId: text("folder_id").notNull(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+});

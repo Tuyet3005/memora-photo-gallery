@@ -132,29 +132,54 @@ function ThumbnailImage({
 
 export function ImageCarousel({
   folderId,
+  shareId,
   uploadCount = 0,
   currentThumbnailFileId,
   onThumbnailSet,
+  readOnly = false,
 }: {
   folderId?: string;
+  shareId?: string;
   uploadCount?: number;
   currentThumbnailFileId?: string | null;
   onThumbnailSet?: (fileId: string, thumbnailLink: string) => void;
+  readOnly?: boolean;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   const {
-    data: mediaPages,
-    fetchNextPage,
-    hasNextPage,
+    data: authenticatedPages,
+    fetchNextPage: fetchNextAuthenticated,
+    hasNextPage: hasNextAuthenticated,
   } = useInfiniteQuery({
     ...trpc.drive.listMedia.infiniteQueryOptions(
       { folderId },
       { getNextPageParam: (page) => page.nextCursor ?? undefined },
     ),
+    enabled: !shareId,
     refetchOnWindowFocus: false,
   });
+
+  const {
+    data: sharedPages,
+    fetchNextPage: fetchNextShared,
+    hasNextPage: hasNextShared,
+  } = useInfiniteQuery({
+    ...trpc.share.listSharedMedia.infiniteQueryOptions(
+      { shareId: shareId ?? "" },
+      {
+        getNextPageParam: (page) =>
+          page ? (page.nextCursor ?? undefined) : undefined,
+      },
+    ),
+    enabled: !!shareId,
+    refetchOnWindowFocus: false,
+  });
+
+  const mediaPages = shareId ? sharedPages : authenticatedPages;
+  const fetchNextPage = shareId ? fetchNextShared : fetchNextAuthenticated;
+  const hasNextPage = shareId ? hasNextShared : hasNextAuthenticated;
 
   const files = mediaPages?.pages.flatMap((p) => p.files) ?? [];
   const visibleFiles = files.filter((f) => f.thumbnailLink);
@@ -306,7 +331,7 @@ export function ImageCarousel({
                     rounded
                   />
                 ))}
-              {i === currentIndex && file.id && (
+              {i === currentIndex && file.id && !readOnly && (
                 <div className="absolute top-2 right-2 z-20 flex gap-1">
                   {folderId && onThumbnailSet && file.thumbnailLink && (
                     <Button

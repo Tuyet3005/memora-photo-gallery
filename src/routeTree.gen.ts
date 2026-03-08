@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ShareUuidRouteImport } from './routes/share/$uuid'
 import { Route as ApiUploadSplatRouteImport } from './routes/api.upload.$'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -23,6 +24,11 @@ const SigninRoute = SigninRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShareUuidRoute = ShareUuidRouteImport.update({
+  id: '/share/$uuid',
+  path: '/share/$uuid',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUploadSplatRoute = ApiUploadSplatRouteImport.update({
@@ -44,6 +50,7 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/signin': typeof SigninRoute
+  '/share/$uuid': typeof ShareUuidRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/api/upload/$': typeof ApiUploadSplatRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/signin': typeof SigninRoute
+  '/share/$uuid': typeof ShareUuidRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/api/upload/$': typeof ApiUploadSplatRoute
@@ -59,19 +67,33 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/signin': typeof SigninRoute
+  '/share/$uuid': typeof ShareUuidRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/api/upload/$': typeof ApiUploadSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/signin' | '/api/auth/$' | '/api/trpc/$' | '/api/upload/$'
+  fullPaths:
+    | '/'
+    | '/signin'
+    | '/share/$uuid'
+    | '/api/auth/$'
+    | '/api/trpc/$'
+    | '/api/upload/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/signin' | '/api/auth/$' | '/api/trpc/$' | '/api/upload/$'
+  to:
+    | '/'
+    | '/signin'
+    | '/share/$uuid'
+    | '/api/auth/$'
+    | '/api/trpc/$'
+    | '/api/upload/$'
   id:
     | '__root__'
     | '/'
     | '/signin'
+    | '/share/$uuid'
     | '/api/auth/$'
     | '/api/trpc/$'
     | '/api/upload/$'
@@ -80,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SigninRoute: typeof SigninRoute
+  ShareUuidRoute: typeof ShareUuidRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
   ApiUploadSplatRoute: typeof ApiUploadSplatRoute
@@ -99,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/share/$uuid': {
+      id: '/share/$uuid'
+      path: '/share/$uuid'
+      fullPath: '/share/$uuid'
+      preLoaderRoute: typeof ShareUuidRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/upload/$': {
@@ -128,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SigninRoute: SigninRoute,
+  ShareUuidRoute: ShareUuidRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
   ApiUploadSplatRoute: ApiUploadSplatRoute,

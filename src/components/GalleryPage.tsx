@@ -2,10 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   CheckCircle2,
+  Copy,
   Folder,
   Home,
   Loader2,
   RefreshCw,
+  Share2,
   Upload,
   XCircle,
 } from "lucide-react";
@@ -41,6 +43,7 @@ import {
 } from "#/components/ui/tooltip";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
+import { cn } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
 
 type FileUploadStatus = "pending" | "retrying" | "done" | "error";
@@ -127,6 +130,9 @@ export function GalleryPage() {
     string | null
   >(null);
   const [delegationInitialized, setDelegationInitialized] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const { data: preferences } = useQuery(
     trpc.user.getPreferences.queryOptions(),
@@ -198,6 +204,32 @@ export function GalleryPage() {
   const generateUploadUrl = useMutation(
     trpc.drive.generateUploadUrl.mutationOptions(),
   );
+
+  const createFolderShare = useMutation(
+    trpc.share.createFolderShare.mutationOptions(),
+  );
+
+  function handleShare() {
+    if (!currentFolderId) return;
+    createFolderShare.mutate(
+      { folderId: currentFolderId },
+      {
+        onSuccess: ({ shareId }) => {
+          const url = `${window.location.origin}/share/${shareId}`;
+          setShareLink(url);
+          setShareDialogOpen(true);
+          setShareCopied(false);
+        },
+      },
+    );
+  }
+
+  function handleCopyShareLink() {
+    if (!shareLink) return;
+    navigator.clipboard.writeText(shareLink);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  }
 
   function openFolder(id: string, name: string) {
     setFolderStack((prev) => [...prev, { id, name }]);
@@ -358,6 +390,37 @@ export function GalleryPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Share folder</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground text-sm">
+            Anyone with this link can view the photos in this folder.
+          </p>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={shareLink ?? ""}
+              className="flex-1 rounded-md border border-input bg-muted px-3 py-2 text-sm"
+            />
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={handleCopyShareLink}
+              aria-label="Copy link"
+              className={cn(shareCopied && "text-green-600")}
+            >
+              {shareCopied ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between gap-4">
         <Breadcrumb>
           <BreadcrumbList>
@@ -461,6 +524,26 @@ export function GalleryPage() {
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
+          {currentFolderId && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={createFolderShare.isPending}
+                  onClick={handleShare}
+                  aria-label="Share folder"
+                >
+                  {createFolderShare.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Share2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Share folder</TooltipContent>
+            </Tooltip>
+          )}
           {grantorData && grantorData.grantors.length > 0 && (
             <Select
               value={selectedDelegationId ?? "me"}
