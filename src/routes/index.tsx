@@ -6,8 +6,8 @@ import { authClient } from "#/lib/auth-client";
 
 export const Route = createFileRoute("/")({
   validateSearch: z.object({
-    folder: z.string().optional(),
     name: z.string().optional(),
+    folder: z.string().optional(),
   }),
   head: ({ match }) => ({
     meta: [

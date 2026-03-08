@@ -1,8 +1,18 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import { Button } from "#/components/ui/button";
 import BetterAuthHeader from "../integrations/better-auth/header-user.tsx";
 
 export default function Header() {
+  const search = useSearch({ strict: false });
+  const folderId =
+    "folder" in search && typeof search.folder === "string"
+      ? search.folder
+      : undefined;
+  const folderName =
+    "name" in search && typeof search.name === "string"
+      ? search.name
+      : undefined;
+
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--header-bg)] px-4 backdrop-blur-lg">
       <nav className="page-wrap flex flex-wrap items-center gap-x-3 gap-y-2 py-3 sm:py-4">
@@ -23,9 +33,14 @@ export default function Header() {
           <Button variant="ghost" size="sm" asChild>
             <Link
               to="/"
+              search={
+                folderId && folderName
+                  ? { name: folderName, folder: folderId }
+                  : {}
+              }
               activeProps={{ className: "bg-accent text-accent-foreground" }}
             >
-              Home
+              {folderName ?? "Home"}
             </Link>
           </Button>
         </div>

@@ -143,16 +143,33 @@ export function GalleryPage() {
     enabled: !!preferences?.homeFolderId,
   });
 
+  const { data: urlFolderPath } = useQuery({
+    ...trpc.drive.getFolderPath.queryOptions({
+      folderId: search.folder ?? "",
+    }),
+    enabled: !!search.folder,
+  });
+
   // Initialize folderStack from home folder on first load
   useEffect(() => {
     if (folderStackInitialized) return;
     if (!preferences) return;
     if (preferences.homeFolderId && !homeFolderPath) return; // wait for path
+    // If URL specifies a folder, wait for its path before initializing
+    if (search.folder && !urlFolderPath) return;
     setFolderStackInitialized(true);
-    if (homeFolderPath) {
+    if (search.folder && urlFolderPath) {
+      setFolderStack([YOUR_GALLERY, ...urlFolderPath]);
+    } else if (homeFolderPath) {
       setFolderStack([YOUR_GALLERY, ...homeFolderPath]);
     }
-  }, [preferences, homeFolderPath, folderStackInitialized]);
+  }, [
+    preferences,
+    homeFolderPath,
+    urlFolderPath,
+    folderStackInitialized,
+    search.folder,
+  ]);
 
   // visibleStack: everything from the first "Memora" entry onward, otherwise full stack
   const memoraIdx = folderStack.findIndex((f) => f.name === "Memora");
@@ -184,7 +201,7 @@ export function GalleryPage() {
 
   function openFolder(id: string, name: string) {
     setFolderStack((prev) => [...prev, { id, name }]);
-    navigate({ to: "/", search: { folder: id, name }, replace: false });
+    navigate({ to: "/", search: { name, folder: id }, replace: false });
   }
 
   const uploading = uploadEntries.some(
@@ -373,7 +390,7 @@ export function GalleryPage() {
                           if (top.id) {
                             navigate({
                               to: "/",
-                              search: { folder: top.id, name: top.name },
+                              search: { name: top.name, folder: top.id },
                               replace: false,
                             });
                           } else {
