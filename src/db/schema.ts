@@ -68,6 +68,16 @@ export const signedUpload = sqliteTable("signed_upload", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
+export const imageOriginalVersion = sqliteTable("image_original_version", {
+  fileId: text("file_id").primaryKey(),
+  // Drive revision ID of the original (pre-rotation) file content
+  revisionId: text("revision_id").notNull(),
+  // Cumulative degrees rotated counter-clockwise from the original
+  rotationDeg: integer("rotation_deg").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
 export const uploadDelegation = sqliteTable("upload_delegation", {
   id: text().primaryKey(),
   grantorId: text("grantor_id")

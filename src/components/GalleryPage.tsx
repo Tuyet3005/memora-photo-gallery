@@ -96,11 +96,20 @@ export function GalleryPage() {
     refetchOnWindowFocus: false,
   });
 
-  // Hide stale data from a previous folder while the new one loads
-  const visibleFiles = isFetching ? undefined : files;
+  // Hide content when navigating to a new folder (no cached data yet) or
+  // when the folder just changed and is actively fetching fresh data.
+  const [fetchingFolderId, setFetchingFolderId] = useState(currentFolderId);
+  const folderChanged = fetchingFolderId !== currentFolderId;
+  useEffect(() => {
+    if (!isFetching) setFetchingFolderId(currentFolderId);
+  }, [isFetching, currentFolderId]);
+
+  const visibleFiles =
+    isPending || (folderChanged && isFetching) ? undefined : files;
 
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadCount, setUploadCount] = useState(0);
   const [uploadEntries, setUploadEntries] = useState<FileUploadEntry[]>([]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedDelegationId, setSelectedDelegationId] = useState<
@@ -243,6 +252,7 @@ export function GalleryPage() {
     await queryClient.invalidateQueries(
       trpc.drive.listFiles.queryOptions({ folderId: currentFolderId }),
     );
+    setUploadCount((c) => c + 1);
   }
 
   return (
@@ -457,35 +467,38 @@ export function GalleryPage() {
       </div>
 
       <div className="mt-6">
-        <ImageCarousel files={visibleFiles ?? []} folderId={currentFolderId} />
+        <ImageCarousel
+          files={visibleFiles ?? []}
+          folderId={currentFolderId}
+          uploadCount={uploadCount}
+        />
       </div>
 
-      {(isPending || isFetching) && (
+      {visibleFiles === undefined && (
         <div className="flex justify-center py-12">
           <img src="/loading.gif" alt="Loading…" className="w-[60%] max-w-52" />
         </div>
       )}
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {!isPending &&
-          visibleFiles?.map((f) => {
-            const isFolder = f.mimeType === FOLDER_MIME;
-            if (!isFolder) return null;
+        {visibleFiles?.map((f) => {
+          const isFolder = f.mimeType === FOLDER_MIME;
+          if (!isFolder) return null;
 
-            return (
-              <button
-                key={f.id}
-                type="button"
-                className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center cursor-pointer hover:bg-(--surface-hover) w-full"
-                onClick={() => openFolder(f.id ?? "", f.name ?? "")}
-              >
-                <Folder className="h-16 w-16 text-(--lagoon-deep)" />
-                <span className="w-full truncate text-xs text-(--sea-ink)">
-                  {f.name}
-                </span>
-              </button>
-            );
-          })}
+          return (
+            <button
+              key={f.id}
+              type="button"
+              className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center cursor-pointer hover:bg-(--surface-hover) w-full"
+              onClick={() => openFolder(f.id ?? "", f.name ?? "")}
+            >
+              <Folder className="h-16 w-16 text-(--lagoon-deep)" />
+              <span className="w-full truncate text-xs text-(--sea-ink)">
+                {f.name}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </main>
   );

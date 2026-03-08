@@ -2,7 +2,7 @@ import { Readable } from "node:stream";
 import { createFileRoute } from "@tanstack/react-router";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "#/db/index";
-import { signedUpload } from "#/db/schema";
+import { imageOriginalVersion, signedUpload } from "#/db/schema";
 import { getAuthedDrive } from "#/lib/drive";
 
 async function handler({ request }: { request: Request }) {
@@ -78,7 +78,13 @@ async function handler({ request }: { request: Request }) {
           })
         ).data;
 
-    await db.delete(signedUpload).where(eq(signedUpload.id, uploadId));
+    await Promise.all([
+      db.delete(signedUpload).where(eq(signedUpload.id, uploadId)),
+      existingId &&
+        db
+          .delete(imageOriginalVersion)
+          .where(eq(imageOriginalVersion.fileId, existingId)),
+    ]);
 
     return Response.json(
       { fileId: resData.id, name: resData.name, mimeType: resData.mimeType },

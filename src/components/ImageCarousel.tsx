@@ -104,9 +104,11 @@ function ThumbnailImage({
 export function ImageCarousel({
   files,
   folderId,
+  uploadCount = 0,
 }: {
   files: inferRouterOutputs<typeof driveRouter>["listFiles"];
   folderId?: string;
+  uploadCount?: number;
 }) {
   const photoFiles = files.filter((file) =>
     file.mimeType?.startsWith("image/"),
@@ -122,11 +124,11 @@ export function ImageCarousel({
     Record<string, number>
   >({});
 
-  // Clear optimistic rotations when navigating to a different folder
-  // biome-ignore lint/correctness/useExhaustiveDependencies: folderId is the trigger
+  // Clear optimistic rotations when navigating to a different folder or after upload
+  // biome-ignore lint/correctness/useExhaustiveDependencies: folderId and uploadCount are the triggers
   useEffect(() => {
     setOptimisticRotations({});
-  }, [folderId]);
+  }, [folderId, uploadCount]);
   // Map from fileId -> whether a request is in-flight
   const [inFlight, setInFlight] = useState<Record<string, boolean>>({});
 
@@ -238,7 +240,7 @@ export function ImageCarousel({
                   aria-label="Rotate left"
                 >
                   {inFlight[file.id] ? (
-                    <Loader2 className="size-5 animate-spin" />
+                    <Loader2 className="size-5 animate-spin direction-[reverse]" />
                   ) : (
                     <RotateCcw className="size-5" />
                   )}
