@@ -85,10 +85,19 @@ export function GalleryPage() {
   // Pass undefined for root (empty id = Your gallery)
   const currentFolderId = currentFolder.id || undefined;
 
-  const { data: files, isPending } = useQuery({
+  const {
+    data: files,
+    isPending,
+    isFetching,
+  } = useQuery({
     ...trpc.drive.listFiles.queryOptions({ folderId: currentFolderId }),
     enabled: folderStackInitialized,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   });
+
+  // Hide stale data from a previous folder while the new one loads
+  const visibleFiles = isFetching ? undefined : files;
 
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -448,10 +457,10 @@ export function GalleryPage() {
       </div>
 
       <div className="mt-6">
-        <ImageCarousel files={files ?? []} />
+        <ImageCarousel files={visibleFiles ?? []} folderId={currentFolderId} />
       </div>
 
-      {isPending && (
+      {(isPending || isFetching) && (
         <div className="flex justify-center py-12">
           <img src="/loading.gif" alt="Loading…" className="w-[60%] max-w-52" />
         </div>
@@ -459,7 +468,7 @@ export function GalleryPage() {
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {!isPending &&
-          files?.map((f) => {
+          visibleFiles?.map((f) => {
             const isFolder = f.mimeType === FOLDER_MIME;
             if (!isFolder) return null;
 

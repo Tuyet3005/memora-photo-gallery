@@ -1,6 +1,8 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { inferRouterOutputs } from "@trpc/server";
-import { Video } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Loader2, RotateCcw, Video } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "#/components/ui/button";
 import {
   Carousel,
   type CarouselApi,
@@ -10,6 +12,7 @@ import {
   CarouselPrevious,
 } from "#/components/ui/carousel";
 import { Skeleton } from "#/components/ui/skeleton";
+import { useTRPC } from "#/integrations/trpc/react";
 import type { driveRouter } from "#/integrations/trpc/routers/drive";
 import { cn } from "#/lib/utils";
 
@@ -24,12 +27,14 @@ function ThumbnailImage({
   mimeType,
   fitType = "contain",
   maxWidth,
+  rotateDeg = 0,
 }: {
   thumbnailLink: string;
   name: string;
   mimeType: string;
   fitType?: "contain" | "cover";
   maxWidth?: number;
+  rotateDeg?: number;
 }) {
   const [fullStarted, setFullStarted] = useState(false);
   const [fullLoaded, setFullLoaded] = useState(false);
@@ -50,6 +55,14 @@ function ThumbnailImage({
   const objectFitClass =
     fitType === "cover" ? "object-cover" : "object-contain";
 
+  const rotateStyle =
+    rotateDeg !== 0
+      ? {
+          transform: `rotate(${rotateDeg}deg)`,
+          transition: "transform 0.3s ease",
+        }
+      : { transition: "transform 0.3s ease" };
+
   return (
     <div className="relative h-full w-full overflow-hidden rounded-md">
       {mimeType.startsWith("video/") && (
@@ -64,7 +77,8 @@ function ThumbnailImage({
         <img
           src={lh3Src(thumbnailLink, 20)}
           alt={name}
-          className={`select-none absolute inset-0 h-full w-full ${objectFitClass} object-center transition-opacity duration-300 blur-xs ${lowLoaded ? "opacity-100" : "opacity-0"}`}
+          style={rotateStyle}
+          className={`select-none absolute inset-0 h-full w-full ${objectFitClass} object-center duration-300 blur-xs ${lowLoaded ? "opacity-100" : "opacity-0"}`}
           referrerPolicy="no-referrer"
           onLoad={() => {
             setLowLoaded(true);
@@ -77,6 +91,7 @@ function ThumbnailImage({
         <img
           src={lh3Src(thumbnailLink, maxWidth)}
           alt={name}
+          style={rotateStyle}
           className={`select-none h-full w-full ${objectFitClass} object-center ${fullLoaded ? "opacity-100" : "opacity-0"}`}
           referrerPolicy="no-referrer"
           onLoad={() => setTimeout(() => setFullLoaded(true), 300)}
@@ -88,16 +103,45 @@ function ThumbnailImage({
 
 export function ImageCarousel({
   files,
+  folderId,
 }: {
   files: inferRouterOutputs<typeof driveRouter>["listFiles"];
+  folderId?: string;
 }) {
   const photoFiles = files.filter((file) =>
     file.mimeType?.startsWith("image/"),
   );
+  const visibleFiles = photoFiles.filter((file) => file.thumbnailLink);
 
   const [api, setApi] = useState<CarouselApi>();
   const [thumbnailApi, setThumbnailApi] = useState<CarouselApi>();
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Map from fileId -> cumulative optimistic rotation in degrees
+  const [optimisticRotations, setOptimisticRotations] = useState<
+    Record<string, number>
+  >({});
+
+  // Clear optimistic rotations when navigating to a different folder
+  // biome-ignore lint/correctness/useExhaustiveDependencies: folderId is the trigger
+  useEffect(() => {
+    setOptimisticRotations({});
+  }, [folderId]);
+  // Map from fileId -> whether a request is in-flight
+  const [inFlight, setInFlight] = useState<Record<string, boolean>>({});
+
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  const rotateImage = useMutation(trpc.mediaEdit.rotateImage.mutationOptions());
+
+  // Per-file debounce state: pending click count + timer
+  const pendingRef = useRef<
+    Record<
+      string,
+      { clicks: number; timer: ReturnType<typeof setTimeout> | null }
+    >
+  >({});
 
   useEffect(() => {
     if (!thumbnailApi || !api) return;
@@ -114,6 +158,53 @@ export function ImageCarousel({
     return null;
   }
 
+  function handleRotateLeft(fileId: string) {
+    if (inFlight[fileId]) return;
+
+    const state = pendingRef.current[fileId] ?? { clicks: 0, timer: null };
+
+    // Accumulate click and optimistically rotate
+    state.clicks += 1;
+    setOptimisticRotations((prev) => ({
+      ...prev,
+      [fileId]: (prev[fileId] ?? 0) - 90,
+    }));
+
+    // Reset debounce timer
+    if (state.timer) clearTimeout(state.timer);
+    state.timer = setTimeout(() => {
+      const totalClicks = pendingRef.current[fileId]?.clicks ?? 0;
+      pendingRef.current[fileId] = { clicks: 0, timer: null };
+
+      const degrees = (totalClicks * 90) % 360;
+      if (degrees === 0) return;
+
+      setInFlight((prev) => ({ ...prev, [fileId]: true }));
+
+      rotateImage.mutate(
+        { fileId, degrees },
+        {
+          onSettled: () => {
+            setInFlight((prev) => ({ ...prev, [fileId]: false }));
+            queryClient.invalidateQueries({
+              ...trpc.drive.listFiles.queryOptions({ folderId }),
+              refetchType: "none",
+            });
+          },
+          onError: () => {
+            // Revert all pending optimistic rotations
+            setOptimisticRotations((prev) => ({
+              ...prev,
+              [fileId]: ((prev[fileId] ?? 0) + degrees) % 360,
+            }));
+          },
+        },
+      );
+    }, 500);
+
+    pendingRef.current[fileId] = state;
+  }
+
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: Intended for keyboard navigation
     <div
@@ -127,19 +218,34 @@ export function ImageCarousel({
     >
       <Carousel setApi={setApi} opts={{ duration: 20 }}>
         <CarouselContent className="h-[60vh]">
-          {photoFiles
-            .filter((file) => file.thumbnailLink)
-            .map((file, i) => (
-              <CarouselItem key={file.id}>
-                {Math.abs(i - currentIndex) <= 3 && (
-                  <ThumbnailImage
-                    thumbnailLink={file.thumbnailLink!}
-                    name={file.name ?? ""}
-                    mimeType={file.mimeType ?? ""}
-                  />
-                )}
-              </CarouselItem>
-            ))}
+          {visibleFiles.map((file, i) => (
+            <CarouselItem key={file.id} className="relative">
+              {Math.abs(i - currentIndex) <= 3 && (
+                <ThumbnailImage
+                  thumbnailLink={file.thumbnailLink!}
+                  name={file.name ?? ""}
+                  mimeType={file.mimeType ?? ""}
+                  rotateDeg={optimisticRotations[file.id!] ?? 0}
+                />
+              )}
+              {i === currentIndex && file.id && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  disabled={!!inFlight[file.id]}
+                  className="absolute top-2 right-2 z-20 bg-black/50 text-white hover:bg-black/70 hover:text-white disabled:opacity-50"
+                  onClick={() => handleRotateLeft(file.id!)}
+                  aria-label="Rotate left"
+                >
+                  {inFlight[file.id] ? (
+                    <Loader2 className="size-5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="size-5" />
+                  )}
+                </Button>
+              )}
+            </CarouselItem>
+          ))}
         </CarouselContent>
         <CarouselPrevious />
         <CarouselNext />
@@ -149,30 +255,29 @@ export function ImageCarousel({
         opts={{ containScroll: false, dragFree: true }}
       >
         <CarouselContent className="h-24 mt-4 py-1">
-          {photoFiles
-            .filter((file) => file.thumbnailLink)
-            .map((file, i) => (
-              <CarouselItem
-                key={file.id}
-                className={cn(
-                  "p-2 h-full basis-1/12 cursor-pointer rounded-md transition-opacity hover:opacity-100",
-                  currentIndex === i
-                    ? "opacity-100 outline-2 outline-(--lagoon-deep)"
-                    : "opacity-80",
-                )}
-                onClick={() => {
-                  api?.scrollTo(i);
-                }}
-              >
-                <ThumbnailImage
-                  thumbnailLink={file.thumbnailLink!}
-                  name={file.name ?? ""}
-                  mimeType={file.mimeType ?? ""}
-                  fitType="cover"
-                  maxWidth={100}
-                />
-              </CarouselItem>
-            ))}
+          {visibleFiles.map((file, i) => (
+            <CarouselItem
+              key={file.id}
+              className={cn(
+                "p-2 h-full basis-1/12 cursor-pointer rounded-md transition-opacity hover:opacity-100",
+                currentIndex === i
+                  ? "opacity-100 outline-2 outline-(--lagoon-deep)"
+                  : "opacity-80",
+              )}
+              onClick={() => {
+                api?.scrollTo(i);
+              }}
+            >
+              <ThumbnailImage
+                thumbnailLink={file.thumbnailLink!}
+                name={file.name ?? ""}
+                mimeType={file.mimeType ?? ""}
+                fitType="cover"
+                maxWidth={100}
+                rotateDeg={optimisticRotations[file.id!] ?? 0}
+              />
+            </CarouselItem>
+          ))}
         </CarouselContent>
       </Carousel>
     </div>
