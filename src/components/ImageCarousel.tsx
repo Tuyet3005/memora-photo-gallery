@@ -43,7 +43,7 @@ export function ImageCarousel({
   shareId?: string;
   uploadCount?: number;
   currentThumbnailFileId?: string | null;
-  onThumbnailSet?: (fileId: string, thumbnailLink: string) => void;
+  onThumbnailSet?: (fileId: string) => void;
   readOnly?: boolean;
 }) {
   const trpc = useTRPC();
@@ -239,9 +239,7 @@ export function ImageCarousel({
                       size="icon"
                       variant="ghost"
                       className="bg-black/50 text-white hover:bg-black/70 hover:text-white"
-                      onClick={() =>
-                        onThumbnailSet(file.id!, file.thumbnailLink!)
-                      }
+                      onClick={() => onThumbnailSet(file.id!)}
                       aria-label="Set as folder thumbnail"
                     >
                       <Star

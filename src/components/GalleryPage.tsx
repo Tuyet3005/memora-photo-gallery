@@ -104,6 +104,21 @@ export function GalleryPage() {
     refetchOnWindowFocus: false,
   });
 
+  // Only hide content when there's no cached data at all for this folder.
+  const folders = isPending ? undefined : (foldersData ?? []);
+
+  // Collect fileIds of folders that have a thumbnail set, then fetch fresh links
+  const thumbnailFileIds = (folders ?? [])
+    .map((f) => f.thumbnail?.fileId)
+    .filter(Boolean) as string[];
+  const { data: folderThumbnailLinks } = useQuery({
+    ...trpc.drive.getFolderThumbnails.queryOptions({
+      fileIds: thumbnailFileIds,
+    }),
+    enabled: thumbnailFileIds.length > 0,
+    refetchOnWindowFocus: false,
+  });
+
   const parentFolderId =
     folderStack.length >= 2
       ? folderStack[folderStack.length - 2].id || undefined
@@ -118,9 +133,6 @@ export function GalleryPage() {
       ? (parentFoldersData.find((f) => f.id === currentFolderId)?.thumbnail
           ?.fileId ?? null)
       : null;
-
-  // Only hide content when there's no cached data at all for this folder.
-  const folders = isPending ? undefined : (foldersData ?? []);
 
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -237,7 +249,12 @@ export function GalleryPage() {
 
   function openFolder(id: string, name: string) {
     setFolderStack((prev) => [...prev, { id, name }]);
-    navigate({ to: "/", search: { name, folder: id }, replace: false });
+    const isHome = id === preferences?.homeFolderId;
+    navigate({
+      to: "/",
+      search: isHome ? {} : { name, folder: id },
+      replace: false,
+    });
   }
 
   const uploading = uploadEntries.some(
@@ -454,7 +471,9 @@ export function GalleryPage() {
                           const newStack = folderStack.slice(0, stackIdx + 1);
                           setFolderStack(newStack);
                           const top = newStack[newStack.length - 1];
-                          if (top.id) {
+                          const topIsHome =
+                            top.id === preferences?.homeFolderId;
+                          if (top.id && !topIsHome) {
                             navigate({
                               to: "/",
                               search: { name: top.name, folder: top.id },
@@ -628,10 +647,10 @@ export function GalleryPage() {
             folderId={currentFolderId}
             uploadCount={uploadCount}
             currentThumbnailFileId={currentFolderThumbnailFileId}
-            onThumbnailSet={(fileId, thumbnailLink) => {
+            onThumbnailSet={(fileId) => {
               if (!currentFolderId) return;
               setFolderThumbnailMutation.mutate(
-                { folderId: currentFolderId, fileId, thumbnailLink },
+                { folderId: currentFolderId, fileId },
                 {
                   onSuccess: () => {
                     toast.success("Folder thumbnail updated");
@@ -662,9 +681,9 @@ export function GalleryPage() {
             className="relative overflow-hidden rounded-xl border border-(--line) bg-(--surface) cursor-pointer hover:opacity-90 w-full aspect-square"
             onClick={() => openFolder(f.id ?? "", f.name ?? "")}
           >
-            {f.thumbnail ? (
+            {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
               <ThumbnailImage
-                thumbnailLink={f.thumbnail.thumbnailLink}
+                thumbnailLink={folderThumbnailLinks[f.thumbnail.fileId]!}
                 name={f.name ?? ""}
                 mimeType="image/"
                 fitType="cover"

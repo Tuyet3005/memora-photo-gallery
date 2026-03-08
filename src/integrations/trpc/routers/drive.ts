@@ -73,7 +73,6 @@ export const driveRouter = createTRPCRouter({
       z.object({
         folderId: z.string(),
         fileId: z.string(),
-        thumbnailLink: z.string(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -83,7 +82,6 @@ export const driveRouter = createTRPCRouter({
         .values({
           folderId: input.folderId,
           fileId: input.fileId,
-          thumbnailLink: input.thumbnailLink,
           createdAt: now,
           updatedAt: now,
         })
@@ -91,10 +89,28 @@ export const driveRouter = createTRPCRouter({
           target: folderThumbnail.folderId,
           set: {
             fileId: input.fileId,
-            thumbnailLink: input.thumbnailLink,
             updatedAt: now,
           },
         });
+    }),
+
+  getFolderThumbnails: protectedProcedure
+    .input(z.object({ fileIds: z.array(z.string()) }))
+    .query(async ({ ctx, input }) => {
+      if (input.fileIds.length === 0) return {};
+      const drive = await getAuthedDrive(ctx.session.user.id);
+      const results = await Promise.all(
+        input.fileIds.map(async (fileId) => {
+          const res = await drive.files.get({
+            fileId,
+            fields: "id,thumbnailLink",
+          });
+          return { fileId, thumbnailLink: res.data.thumbnailLink ?? null };
+        }),
+      );
+      return Object.fromEntries(
+        results.map(({ fileId, thumbnailLink }) => [fileId, thumbnailLink]),
+      );
     }),
 
   listMedia: protectedProcedure

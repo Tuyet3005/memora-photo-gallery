@@ -1,0 +1,1 @@
+ALTER TABLE `folder_thumbnail` DROP COLUMN `thumbnail_link`;
