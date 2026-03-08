@@ -78,6 +78,14 @@ export const imageOriginalVersion = sqliteTable("image_original_version", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+export const folderThumbnail = sqliteTable("folder_thumbnail", {
+  folderId: text("folder_id").primaryKey(),
+  fileId: text("file_id").notNull(),
+  thumbnailLink: text("thumbnail_link").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
 export const uploadDelegation = sqliteTable("upload_delegation", {
   id: text().primaryKey(),
   grantorId: text("grantor_id")

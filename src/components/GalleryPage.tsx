@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   CheckCircle2,
   Folder,
@@ -94,6 +95,21 @@ export function GalleryPage() {
     refetchOnWindowFocus: false,
   });
 
+  const parentFolderId =
+    folderStack.length >= 2
+      ? folderStack[folderStack.length - 2].id || undefined
+      : undefined;
+  const { data: parentFoldersData } = useQuery({
+    ...trpc.drive.listFolders.queryOptions({ folderId: parentFolderId }),
+    enabled: folderStackInitialized && folderStack.length >= 2,
+    refetchOnWindowFocus: false,
+  });
+  const currentFolderThumbnailFileId =
+    currentFolderId && parentFoldersData
+      ? (parentFoldersData.find((f) => f.id === currentFolderId)?.thumbnail
+          ?.fileId ?? null)
+      : null;
+
   // Hide content when navigating to a new folder (no cached data yet) or
   // when the folder just changed and is actively fetching fresh data.
   const [fetchingFolderId, setFetchingFolderId] = useState(currentFolderId);
@@ -161,6 +177,10 @@ export function GalleryPage() {
 
   const setPreference = useMutation(
     trpc.user.setUploadDelegationPreference.mutationOptions(),
+  );
+
+  const setFolderThumbnailMutation = useMutation(
+    trpc.drive.setFolderThumbnail.mutationOptions(),
   );
 
   const generateUploadUrl = useMutation(
@@ -474,7 +494,27 @@ export function GalleryPage() {
       </div>
 
       <div className="mt-6">
-        <ImageCarousel folderId={currentFolderId} uploadCount={uploadCount} />
+        <ImageCarousel
+          folderId={currentFolderId}
+          uploadCount={uploadCount}
+          currentThumbnailFileId={currentFolderThumbnailFileId}
+          onThumbnailSet={(fileId, thumbnailLink) => {
+            if (!currentFolderId) return;
+            setFolderThumbnailMutation.mutate(
+              { folderId: currentFolderId, fileId, thumbnailLink },
+              {
+                onSuccess: () => {
+                  toast.success("Folder thumbnail updated");
+                  queryClient.invalidateQueries(
+                    trpc.drive.listFolders.queryOptions({
+                      folderId: parentFolderId,
+                    }),
+                  );
+                },
+              },
+            );
+          }}
+        />
       </div>
 
       {folders === undefined && (
@@ -488,13 +528,26 @@ export function GalleryPage() {
           <button
             key={f.id}
             type="button"
-            className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center cursor-pointer hover:bg-(--surface-hover) w-full"
+            className="relative overflow-hidden rounded-xl border border-(--line) bg-(--surface) cursor-pointer hover:opacity-90 w-full aspect-square"
             onClick={() => openFolder(f.id ?? "", f.name ?? "")}
           >
-            <Folder className="h-16 w-16 text-(--lagoon-deep)" />
-            <span className="w-full truncate text-xs text-(--sea-ink)">
-              {f.name}
-            </span>
+            {f.thumbnail ? (
+              <img
+                src={f.thumbnail.thumbnailLink}
+                alt={f.name ?? ""}
+                className="absolute inset-0 h-full w-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Folder className="h-16 w-16 text-(--lagoon-deep)" />
+              </div>
+            )}
+            <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-2 py-1.5">
+              <span className="block w-full text-sm font-medium text-white line-clamp-2 leading-snug">
+                {f.name}
+              </span>
+            </div>
           </button>
         ))}
       </div>

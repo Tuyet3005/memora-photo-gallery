@@ -3,7 +3,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Loader2, RotateCcw, Video } from "lucide-react";
+import { Loader2, RotateCcw, Star, Video } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import {
@@ -120,9 +120,13 @@ function ThumbnailImage({
 export function ImageCarousel({
   folderId,
   uploadCount = 0,
+  currentThumbnailFileId,
+  onThumbnailSet,
 }: {
   folderId?: string;
   uploadCount?: number;
+  currentThumbnailFileId?: string | null;
+  onThumbnailSet?: (fileId: string, thumbnailLink: string) => void;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -285,24 +289,46 @@ export function ImageCarousel({
                   rounded
                 />
               )}
-              {i === currentIndex &&
-                file.id &&
-                !file.mimeType?.startsWith("video/") && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    disabled={!!inFlight[file.id]}
-                    className="absolute top-2 right-2 z-20 bg-black/50 text-white hover:bg-black/70 hover:text-white disabled:opacity-50"
-                    onClick={() => handleRotateLeft(file.id!)}
-                    aria-label="Rotate left"
-                  >
-                    {inFlight[file.id] ? (
-                      <Loader2 className="size-5 animate-spin direction-[reverse]" />
-                    ) : (
-                      <RotateCcw className="size-5" />
-                    )}
-                  </Button>
-                )}
+              {i === currentIndex && file.id && (
+                <div className="absolute top-2 right-2 z-20 flex gap-1">
+                  {folderId && onThumbnailSet && file.thumbnailLink && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="bg-black/50 text-white hover:bg-black/70 hover:text-white"
+                      onClick={() =>
+                        onThumbnailSet(file.id!, file.thumbnailLink!)
+                      }
+                      aria-label="Set as folder thumbnail"
+                    >
+                      <Star
+                        className="size-5"
+                        fill={
+                          currentThumbnailFileId === file.id
+                            ? "currentColor"
+                            : "none"
+                        }
+                      />
+                    </Button>
+                  )}
+                  {!file.mimeType?.startsWith("video/") && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={!!inFlight[file.id]}
+                      className="bg-black/50 text-white hover:bg-black/70 hover:text-white disabled:opacity-50"
+                      onClick={() => handleRotateLeft(file.id!)}
+                      aria-label="Rotate left"
+                    >
+                      {inFlight[file.id] ? (
+                        <Loader2 className="size-5 animate-spin direction-[reverse]" />
+                      ) : (
+                        <RotateCcw className="size-5" />
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
             </CarouselItem>
           ))}
         </CarouselContent>

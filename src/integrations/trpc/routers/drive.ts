@@ -1,8 +1,13 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
-import { signedUpload, uploadDelegation, user } from "#/db/schema";
+import {
+  folderThumbnail,
+  signedUpload,
+  uploadDelegation,
+  user,
+} from "#/db/schema";
 import { getAuthedDrive } from "#/lib/drive";
 import { createTRPCRouter, protectedProcedure } from "../init";
 
@@ -42,7 +47,54 @@ export const driveRouter = createTRPCRouter({
         q: `'${parent}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`,
       });
 
-      return res.data.files ?? [];
+      const files = res.data.files ?? [];
+      const folderIds = files.map((f) => f.id).filter(Boolean) as string[];
+
+      const thumbnails =
+        folderIds.length > 0
+          ? await db
+              .select()
+              .from(folderThumbnail)
+              .where(inArray(folderThumbnail.folderId, folderIds))
+          : [];
+
+      const thumbnailMap = Object.fromEntries(
+        thumbnails.map((t) => [t.folderId, t]),
+      );
+
+      return files.map((f) => ({
+        ...f,
+        thumbnail: f.id ? (thumbnailMap[f.id] ?? null) : null,
+      }));
+    }),
+
+  setFolderThumbnail: protectedProcedure
+    .input(
+      z.object({
+        folderId: z.string(),
+        fileId: z.string(),
+        thumbnailLink: z.string(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const now = new Date();
+      await db
+        .insert(folderThumbnail)
+        .values({
+          folderId: input.folderId,
+          fileId: input.fileId,
+          thumbnailLink: input.thumbnailLink,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: folderThumbnail.folderId,
+          set: {
+            fileId: input.fileId,
+            thumbnailLink: input.thumbnailLink,
+            updatedAt: now,
+          },
+        });
     }),
 
   listMedia: protectedProcedure
