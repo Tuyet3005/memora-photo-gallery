@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "#/components/ui/select";
+import { Textarea } from "#/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -43,6 +44,7 @@ import {
 } from "#/components/ui/tooltip";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
+import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
 import { cn } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
 import { ThumbnailImage } from "./ThumbnailImage";
@@ -77,9 +79,67 @@ function AccountOption({
 
 const YOUR_GALLERY = { id: "", name: "Memora" };
 
+function FolderNoteEditorInner({ folderId }: { folderId: string }) {
+  const trpc = useTRPC();
+  const { data } = useQuery({
+    ...trpc.folder.getNote.queryOptions({ folderId }),
+    enabled: !!folderId,
+    refetchOnWindowFocus: false,
+  });
+  const updateNote = useMutation(trpc.folder.updateNote.mutationOptions());
+
+  const [value, setValue] = useState(data?.note ?? "");
+  const [pending, setPending] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (data !== undefined) {
+      setValue(data.note);
+    }
+  }, [data]);
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const next = e.target.value;
+    setValue(next);
+    setPending(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      updateNote.mutate(
+        { folderId, note: next },
+        { onSettled: () => setPending(false) },
+      );
+    }, 800);
+  }
+
+  return (
+    <div className="relative mt-2 flex-1 mb-10">
+      <Textarea
+        className="resize-none h-full"
+        placeholder="Notes…"
+        value={value}
+        onChange={handleChange}
+      />
+      <div className="absolute bottom-2 right-2 text-muted-foreground">
+        {pending || updateNote.isPending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : updateNote.isSuccess ? (
+          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function FolderNoteEditor({ folderId }: { folderId: string }) {
+  return <FolderNoteEditorInner key={folderId} folderId={folderId} />;
+}
+
 export function GalleryPage() {
   const trpc = useTRPC();
   const { data: session } = authClient.useSession();
+  const canEditNotes = NOTE_EDITOR_EMAILS.includes(
+    session?.user.email as (typeof NOTE_EDITOR_EMAILS)[number],
+  );
   const navigate = useNavigate();
   const search = useSearch({ from: "/" });
 
@@ -349,7 +409,7 @@ export function GalleryPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <main className="mx-auto max-w-6xl py-12">
       <input
         ref={fileInputRef}
         type="file"
@@ -442,96 +502,162 @@ export function GalleryPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex items-center justify-between gap-4">
-        <Breadcrumb>
-          <BreadcrumbList>
-            {visibleStack.map((folder, i) => {
-              const isLast = i === visibleStack.length - 1;
-              const isRoot = folder.id === "";
-              const isHome = isRoot
-                ? preferences?.homeFolderId === null
-                : preferences?.homeFolderId === folder.id;
-              // Find the real index in folderStack to slice correctly on navigate
-              const stackIdx = folderStack.indexOf(folder);
-              return (
-                <>
-                  {i > 0 && <BreadcrumbSeparator key={`sep-${stackIdx}`} />}
-                  <BreadcrumbItem
-                    key={`item-${stackIdx}`}
-                    className="flex items-center gap-1"
-                  >
-                    {isLast ? (
-                      <BreadcrumbPage className="text-3xl font-bold text-(--sea-ink)">
-                        {folder.name}
-                      </BreadcrumbPage>
-                    ) : (
-                      <BreadcrumbLink
-                        className="cursor-pointer text-3xl font-bold"
-                        onClick={() => {
-                          const newStack = folderStack.slice(0, stackIdx + 1);
-                          setFolderStack(newStack);
-                          const top = newStack[newStack.length - 1];
-                          const topIsHome =
-                            top.id === preferences?.homeFolderId;
-                          if (top.id && !topIsHome) {
-                            navigate({
-                              to: "/",
-                              search: { name: top.name, folder: top.id },
-                              replace: false,
-                            });
-                          } else {
-                            navigate({ to: "/", search: {}, replace: false });
-                          }
-                        }}
-                      >
-                        {folder.name}
-                      </BreadcrumbLink>
-                    )}
-                    {preferences !== undefined && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="ml-1 rounded p-0.5 hover:bg-muted"
-                            onClick={() => {
-                              setHomeFolderPreference.mutate(
-                                {
-                                  folderId: isHome
+      <Breadcrumb className="w-full">
+        <BreadcrumbList>
+          {visibleStack.map((folder, i) => {
+            const isLast = i === visibleStack.length - 1;
+            const isRoot = folder.id === "";
+            const isHome = isRoot
+              ? preferences?.homeFolderId === null
+              : preferences?.homeFolderId === folder.id;
+            // Find the real index in folderStack to slice correctly on navigate
+            const stackIdx = folderStack.indexOf(folder);
+            return (
+              <>
+                {i > 0 && <BreadcrumbSeparator key={`sep-${stackIdx}`} />}
+                <BreadcrumbItem
+                  key={`item-${stackIdx}`}
+                  className="flex items-center gap-1"
+                >
+                  {isLast ? (
+                    <BreadcrumbPage className="text-3xl font-bold text-(--sea-ink)">
+                      {folder.name}
+                    </BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink
+                      className="cursor-pointer text-3xl font-bold"
+                      onClick={() => {
+                        const newStack = folderStack.slice(0, stackIdx + 1);
+                        setFolderStack(newStack);
+                        const top = newStack[newStack.length - 1];
+                        const topIsHome = top.id === preferences?.homeFolderId;
+                        if (top.id && !topIsHome) {
+                          navigate({
+                            to: "/",
+                            search: { name: top.name, folder: top.id },
+                            replace: false,
+                          });
+                        } else {
+                          navigate({ to: "/", search: {}, replace: false });
+                        }
+                      }}
+                    >
+                      {folder.name}
+                    </BreadcrumbLink>
+                  )}
+                  {preferences !== undefined && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="ml-1 rounded p-0.5 hover:bg-muted"
+                          onClick={() => {
+                            setHomeFolderPreference.mutate(
+                              {
+                                folderId: isHome
+                                  ? null
+                                  : isRoot
                                     ? null
-                                    : isRoot
-                                      ? null
-                                      : folder.id,
-                                },
-                                {
-                                  onSuccess: () =>
-                                    queryClient.invalidateQueries(
-                                      trpc.user.getPreferences.queryOptions(),
-                                    ),
-                                },
-                              );
-                            }}
-                          >
-                            <Home
-                              className={`size-4 ${isHome ? "text-(--lagoon-deep)" : "text-muted-foreground"}`}
-                            />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {isHome ? "Clear home folder" : "Set as home folder"}
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </BreadcrumbItem>
-                </>
-              );
-            })}
-          </BreadcrumbList>
-        </Breadcrumb>
+                                    : folder.id,
+                              },
+                              {
+                                onSuccess: () =>
+                                  queryClient.invalidateQueries(
+                                    trpc.user.getPreferences.queryOptions(),
+                                  ),
+                              },
+                            );
+                          }}
+                        >
+                          <Home
+                            className={`size-4 ${isHome ? "text-(--lagoon-deep)" : "text-muted-foreground"}`}
+                          />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {isHome ? "Clear home folder" : "Set as home folder"}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </BreadcrumbItem>
+              </>
+            );
+          })}
+        </BreadcrumbList>
+      </Breadcrumb>
 
-        <div className="flex items-center gap-2">
+      <div className="mt-6 flex items-stretch gap-24">
+        <div className="min-w-0 flex-1">
+          {folderStackInitialized && (
+            <ImageCarousel
+              folderId={currentFolderId}
+              uploadCount={uploadCount}
+              currentThumbnailFileId={currentFolderThumbnailFileId}
+              onThumbnailSet={(fileId) => {
+                if (!currentFolderId) return;
+                setFolderThumbnailMutation.mutate(
+                  { folderId: currentFolderId, fileId },
+                  {
+                    onSuccess: () => {
+                      toast.success("Folder thumbnail updated");
+                      queryClient.invalidateQueries(
+                        trpc.drive.listFolders.queryOptions({
+                          folderId: parentFolderId,
+                        }),
+                      );
+                    },
+                  },
+                );
+              }}
+            />
+          )}
+
+          {folders === undefined && (
+            <div className="flex justify-center py-12">
+              <img
+                src="/loading.gif"
+                alt="Loading…"
+                className="w-[60%] max-w-52"
+              />
+            </div>
+          )}
+
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {folders?.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className="relative overflow-hidden rounded-xl border border-(--line) bg-(--surface) cursor-pointer hover:opacity-90 w-full aspect-square"
+                onClick={() => openFolder(f.id ?? "", f.name ?? "")}
+              >
+                {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
+                  <ThumbnailImage
+                    thumbnailLink={folderThumbnailLinks[f.thumbnail.fileId]!}
+                    name={f.name ?? ""}
+                    mimeType="image/"
+                    fitType="cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Folder className="h-16 w-16 text-(--lagoon-deep)" />
+                  </div>
+                )}
+                <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-2 py-1.5">
+                  <span className="block h-10 w-full text-sm leading-5 font-medium text-white line-clamp-2">
+                    {f.name}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <aside className="sticky top-20 flex w-56 shrink-0 flex-col gap-2 self-stretch">
           <Button
             variant="outline"
             size="sm"
+            className="w-full justify-start"
             onClick={() => {
               queryClient.resetQueries(
                 trpc.drive.listFolders.queryOptions({
@@ -545,27 +671,24 @@ export function GalleryPage() {
               });
             }}
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
           </Button>
           {currentFolderId && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={createFolderShare.isPending}
-                  onClick={handleShare}
-                  aria-label="Share folder"
-                >
-                  {createFolderShare.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Share2 className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Share folder</TooltipContent>
-            </Tooltip>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              disabled={createFolderShare.isPending}
+              onClick={handleShare}
+            >
+              {createFolderShare.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Share2 className="mr-2 h-4 w-4" />
+              )}
+              Share
+            </Button>
           )}
           {grantorData && grantorData.grantors.length > 0 && (
             <Select
@@ -576,7 +699,7 @@ export function GalleryPage() {
                 setPreference.mutate({ delegationId: newId });
               }}
             >
-              <SelectTrigger size="sm" className="w-44">
+              <SelectTrigger size="sm" className="w-full">
                 {selectedDelegationId === null ? (
                   <AccountOption
                     image={session?.user.image}
@@ -622,6 +745,7 @@ export function GalleryPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="w-full justify-start"
                   disabled={
                     uploading || (!!selectedDelegationId && !currentFolderId)
                   }
@@ -638,68 +762,10 @@ export function GalleryPage() {
               </TooltipContent>
             )}
           </Tooltip>
-        </div>
-      </div>
-
-      <div className="mt-6">
-        {folderStackInitialized && (
-          <ImageCarousel
-            folderId={currentFolderId}
-            uploadCount={uploadCount}
-            currentThumbnailFileId={currentFolderThumbnailFileId}
-            onThumbnailSet={(fileId) => {
-              if (!currentFolderId) return;
-              setFolderThumbnailMutation.mutate(
-                { folderId: currentFolderId, fileId },
-                {
-                  onSuccess: () => {
-                    toast.success("Folder thumbnail updated");
-                    queryClient.invalidateQueries(
-                      trpc.drive.listFolders.queryOptions({
-                        folderId: parentFolderId,
-                      }),
-                    );
-                  },
-                },
-              );
-            }}
-          />
-        )}
-      </div>
-
-      {folders === undefined && (
-        <div className="flex justify-center py-12">
-          <img src="/loading.gif" alt="Loading…" className="w-[60%] max-w-52" />
-        </div>
-      )}
-
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {folders?.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            className="relative overflow-hidden rounded-xl border border-(--line) bg-(--surface) cursor-pointer hover:opacity-90 w-full aspect-square"
-            onClick={() => openFolder(f.id ?? "", f.name ?? "")}
-          >
-            {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
-              <ThumbnailImage
-                thumbnailLink={folderThumbnailLinks[f.thumbnail.fileId]!}
-                name={f.name ?? ""}
-                mimeType="image/"
-                fitType="cover"
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Folder className="h-16 w-16 text-(--lagoon-deep)" />
-              </div>
-            )}
-            <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-2 py-1.5">
-              <span className="block w-full text-sm font-medium text-white line-clamp-2 leading-snug">
-                {f.name}
-              </span>
-            </div>
-          </button>
-        ))}
+          {currentFolderId && canEditNotes && (
+            <FolderNoteEditor folderId={currentFolderId} />
+          )}
+        </aside>
       </div>
     </main>
   );

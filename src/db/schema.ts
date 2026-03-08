@@ -104,3 +104,10 @@ export const folderShare = sqliteTable("folder_share", {
     .references(() => user.id, { onDelete: "cascade" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
+
+export const folderNote = sqliteTable("folder_note", {
+  folderId: text("folder_id").primaryKey(),
+  note: text().notNull().default(""),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
