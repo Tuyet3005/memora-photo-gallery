@@ -1,9 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { z } from "zod";
 import { GalleryPage } from "#/components/GalleryPage";
 import { Button } from "#/components/ui/button";
 import { authClient } from "#/lib/auth-client";
 
-export const Route = createFileRoute("/")({ component: IndexPage });
+export const Route = createFileRoute("/")({
+  validateSearch: z.object({
+    folder: z.string().optional(),
+    name: z.string().optional(),
+  }),
+  head: ({ match }) => ({
+    meta: [
+      {
+        title: match.search.name ? `${match.search.name} | Memora` : "Memora",
+      },
+    ],
+  }),
+  component: IndexPage,
+});
 
 function IndexPage() {
   const { data: session, isPending } = authClient.useSession();

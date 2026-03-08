@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   CheckCircle2,
   Folder,
@@ -75,10 +76,18 @@ const YOUR_GALLERY = { id: "", name: "Your gallery" };
 export function GalleryPage() {
   const trpc = useTRPC();
   const { data: session } = authClient.useSession();
+  const navigate = useNavigate();
+  const search = useSearch({ from: "/" });
+
   // folderStack always has YOUR_GALLERY as index 0
   const [folderStack, setFolderStack] = useState<
     { id: string; name: string }[]
-  >([YOUR_GALLERY]);
+  >(() => {
+    if (search.folder && search.name) {
+      return [YOUR_GALLERY, { id: search.folder, name: search.name }];
+    }
+    return [YOUR_GALLERY];
+  });
   const [folderStackInitialized, setFolderStackInitialized] = useState(false);
 
   const currentFolder = folderStack[folderStack.length - 1];
@@ -175,6 +184,7 @@ export function GalleryPage() {
 
   function openFolder(id: string, name: string) {
     setFolderStack((prev) => [...prev, { id, name }]);
+    navigate({ to: "/", search: { folder: id, name }, replace: false });
   }
 
   const uploading = uploadEntries.some(
@@ -356,9 +366,20 @@ export function GalleryPage() {
                     ) : (
                       <BreadcrumbLink
                         className="cursor-pointer text-3xl font-bold"
-                        onClick={() =>
-                          setFolderStack((prev) => prev.slice(0, stackIdx + 1))
-                        }
+                        onClick={() => {
+                          const newStack = folderStack.slice(0, stackIdx + 1);
+                          setFolderStack(newStack);
+                          const top = newStack[newStack.length - 1];
+                          if (top.id) {
+                            navigate({
+                              to: "/",
+                              search: { folder: top.id, name: top.name },
+                              replace: false,
+                            });
+                          } else {
+                            navigate({ to: "/", search: {}, replace: false });
+                          }
+                        }}
                       >
                         {folder.name}
                       </BreadcrumbLink>
