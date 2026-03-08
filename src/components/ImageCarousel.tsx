@@ -135,12 +135,13 @@ export function ImageCarousel({
     data: mediaPages,
     fetchNextPage,
     hasNextPage,
-  } = useInfiniteQuery(
-    trpc.drive.listMedia.infiniteQueryOptions(
+  } = useInfiniteQuery({
+    ...trpc.drive.listMedia.infiniteQueryOptions(
       { folderId },
       { getNextPageParam: (page) => page.nextCursor ?? undefined },
     ),
-  );
+    refetchOnWindowFocus: false,
+  });
 
   const files = mediaPages?.pages.flatMap((p) => p.files) ?? [];
   const visibleFiles = files.filter((f) => f.thumbnailLink);

@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import {
   CheckCircle2,
   Folder,
   Home,
   Loader2,
+  RefreshCw,
   Upload,
   XCircle,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "#/components/ui/avatar";
 import {
   Breadcrumb,
@@ -84,14 +85,9 @@ export function GalleryPage() {
   // Pass undefined for root (empty id = Your gallery)
   const currentFolderId = currentFolder.id || undefined;
 
-  const {
-    data: foldersData,
-    isPending,
-    isFetching,
-  } = useQuery({
+  const { data: foldersData, isPending } = useQuery({
     ...trpc.drive.listFolders.queryOptions({ folderId: currentFolderId }),
     enabled: folderStackInitialized,
-    refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
 
@@ -110,18 +106,8 @@ export function GalleryPage() {
           ?.fileId ?? null)
       : null;
 
-  // Hide content when navigating to a new folder (no cached data yet) or
-  // when the folder just changed and is actively fetching fresh data.
-  const [fetchingFolderId, setFetchingFolderId] = useState(currentFolderId);
-  const folderChanged = fetchingFolderId !== currentFolderId;
-  useEffect(() => {
-    if (!isFetching) setFetchingFolderId(currentFolderId);
-  }, [isFetching, currentFolderId]);
-
-  const folders =
-    isPending || (folderChanged && isFetching)
-      ? undefined
-      : (foldersData ?? []);
+  // Only hide content when there's no cached data at all for this folder.
+  const folders = isPending ? undefined : (foldersData ?? []);
 
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -419,6 +405,24 @@ export function GalleryPage() {
         </Breadcrumb>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              queryClient.resetQueries(
+                trpc.drive.listFolders.queryOptions({
+                  folderId: currentFolderId,
+                }),
+              );
+              queryClient.resetQueries({
+                queryKey: trpc.drive.listMedia.infiniteQueryKey({
+                  folderId: currentFolderId,
+                }),
+              });
+            }}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
           {grantorData && grantorData.grantors.length > 0 && (
             <Select
               value={selectedDelegationId ?? "me"}
@@ -494,27 +498,29 @@ export function GalleryPage() {
       </div>
 
       <div className="mt-6">
-        <ImageCarousel
-          folderId={currentFolderId}
-          uploadCount={uploadCount}
-          currentThumbnailFileId={currentFolderThumbnailFileId}
-          onThumbnailSet={(fileId, thumbnailLink) => {
-            if (!currentFolderId) return;
-            setFolderThumbnailMutation.mutate(
-              { folderId: currentFolderId, fileId, thumbnailLink },
-              {
-                onSuccess: () => {
-                  toast.success("Folder thumbnail updated");
-                  queryClient.invalidateQueries(
-                    trpc.drive.listFolders.queryOptions({
-                      folderId: parentFolderId,
-                    }),
-                  );
+        {folderStackInitialized && (
+          <ImageCarousel
+            folderId={currentFolderId}
+            uploadCount={uploadCount}
+            currentThumbnailFileId={currentFolderThumbnailFileId}
+            onThumbnailSet={(fileId, thumbnailLink) => {
+              if (!currentFolderId) return;
+              setFolderThumbnailMutation.mutate(
+                { folderId: currentFolderId, fileId, thumbnailLink },
+                {
+                  onSuccess: () => {
+                    toast.success("Folder thumbnail updated");
+                    queryClient.invalidateQueries(
+                      trpc.drive.listFolders.queryOptions({
+                        folderId: parentFolderId,
+                      }),
+                    );
+                  },
                 },
-              },
-            );
-          }}
-        />
+              );
+            }}
+          />
+        )}
       </div>
 
       {folders === undefined && (
