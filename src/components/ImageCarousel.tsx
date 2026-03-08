@@ -101,13 +101,18 @@ export function ImageCarousel({
     setOptimisticRotations({});
   }, [folderId, uploadCount]);
 
-  // Auto-focus the carousel when a new folder is selected and files are available
-  // biome-ignore lint/correctness/useExhaustiveDependencies: folderId is the trigger
+  // Auto-focus the carousel when files become available (covers both folder navigation and initial load/refresh)
+  const hasFocusedRef = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: folderId reset intentional
   useEffect(() => {
-    if (visibleFiles.length > 0) {
+    hasFocusedRef.current = false;
+  }, [folderId]);
+  useEffect(() => {
+    if (visibleFiles.length > 0 && !hasFocusedRef.current) {
+      hasFocusedRef.current = true;
       containerRef.current?.focus();
     }
-  }, [folderId]);
+  }, [visibleFiles.length]);
 
   // Map from fileId -> whether a request is in-flight
   const [inFlight, setInFlight] = useState<Record<string, boolean>>({});

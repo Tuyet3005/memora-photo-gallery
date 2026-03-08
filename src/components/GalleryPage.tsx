@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   CheckCircle2,
-  Copy,
   Folder,
   Home,
   Loader2,
@@ -45,7 +44,6 @@ import {
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
-import { cn } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
 import { ThumbnailImage } from "./ThumbnailImage";
 
@@ -72,7 +70,7 @@ function AccountOption({
           {name.charAt(0).toUpperCase()}
         </AvatarFallback>
       </Avatar>
-      <span className="truncate">{name}</span>
+      <span className="truncate font-medium">{name}</span>
     </div>
   );
 }
@@ -112,7 +110,7 @@ function FolderNoteEditorInner({ folderId }: { folderId: string }) {
   }
 
   return (
-    <div className="relative mt-2 flex-1 mb-10">
+    <div className="relative mt-2 flex-1">
       <Textarea
         className="resize-none h-full"
         placeholder="Notes…"
@@ -203,9 +201,6 @@ export function GalleryPage() {
     string | null
   >(null);
   const [delegationInitialized, setDelegationInitialized] = useState(false);
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
-  const [shareLink, setShareLink] = useState<string | null>(null);
-  const [shareCopied, setShareCopied] = useState(false);
 
   const { data: preferences } = useQuery(
     trpc.user.getPreferences.queryOptions(),
@@ -250,10 +245,11 @@ export function GalleryPage() {
     search.folder,
   ]);
 
-  // visibleStack: everything from the first "Memora" entry onward, otherwise full stack
-  const memoraIdx = folderStack.findIndex((f) => f.name === "Memora");
+  // visibleStack: show from root, but skip synthetic root if the real path already starts with the same name
   const visibleStack =
-    memoraIdx !== -1 ? folderStack.slice(memoraIdx) : folderStack;
+    folderStack.length > 1 && folderStack[1].name === YOUR_GALLERY.name
+      ? folderStack.slice(1)
+      : folderStack;
 
   const setHomeFolderPreference = useMutation(
     trpc.user.setHomeFolderPreference.mutationOptions(),
@@ -289,22 +285,12 @@ export function GalleryPage() {
       {
         onSuccess: ({ shareId }) => {
           const url = `${window.location.origin}/share/${shareId}`;
-          setShareLink(url);
-          setShareDialogOpen(true);
           navigator.clipboard.writeText(url).then(() => {
-            setShareCopied(true);
-            setTimeout(() => setShareCopied(false), 2000);
+            toast.success("Share link copied to clipboard");
           });
         },
       },
     );
-  }
-
-  function handleCopyShareLink() {
-    if (!shareLink) return;
-    navigator.clipboard.writeText(shareLink);
-    setShareCopied(true);
-    setTimeout(() => setShareCopied(false), 2000);
   }
 
   function openFolder(id: string, name: string) {
@@ -409,7 +395,7 @@ export function GalleryPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl py-12">
+    <main className="mx-auto max-w-6xl py-4">
       <input
         ref={fileInputRef}
         type="file"
@@ -471,54 +457,16 @@ export function GalleryPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Share folder</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground text-sm">
-            Anyone with this link can view the photos in this folder.
-          </p>
-          <div className="flex gap-2">
-            <input
-              readOnly
-              value={shareLink ?? ""}
-              className="flex-1 rounded-md border border-input bg-muted px-3 py-2 text-sm"
-            />
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={handleCopyShareLink}
-              aria-label="Copy link"
-              className={cn(shareCopied && "text-green-600")}
-            >
-              {shareCopied ? (
-                <CheckCircle2 className="h-4 w-4" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <Breadcrumb className="w-full">
         <BreadcrumbList>
           {visibleStack.map((folder, i) => {
             const isLast = i === visibleStack.length - 1;
-            const isRoot = folder.id === "";
-            const isHome = isRoot
-              ? preferences?.homeFolderId === null
-              : preferences?.homeFolderId === folder.id;
             // Find the real index in folderStack to slice correctly on navigate
             const stackIdx = folderStack.indexOf(folder);
             return (
               <>
                 {i > 0 && <BreadcrumbSeparator key={`sep-${stackIdx}`} />}
-                <BreadcrumbItem
-                  key={`item-${stackIdx}`}
-                  className="flex items-center gap-1"
-                >
+                <BreadcrumbItem key={`item-${stackIdx}`}>
                   {isLast ? (
                     <BreadcrumbPage className="text-3xl font-bold text-(--sea-ink)">
                       {folder.name}
@@ -544,40 +492,6 @@ export function GalleryPage() {
                     >
                       {folder.name}
                     </BreadcrumbLink>
-                  )}
-                  {preferences !== undefined && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="ml-1 rounded p-0.5 hover:bg-muted"
-                          onClick={() => {
-                            setHomeFolderPreference.mutate(
-                              {
-                                folderId: isHome
-                                  ? null
-                                  : isRoot
-                                    ? null
-                                    : folder.id,
-                              },
-                              {
-                                onSuccess: () =>
-                                  queryClient.invalidateQueries(
-                                    trpc.user.getPreferences.queryOptions(),
-                                  ),
-                              },
-                            );
-                          }}
-                        >
-                          <Home
-                            className={`size-4 ${isHome ? "text-(--lagoon-deep)" : "text-muted-foreground"}`}
-                          />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {isHome ? "Clear home folder" : "Set as home folder"}
-                      </TooltipContent>
-                    </Tooltip>
                   )}
                 </BreadcrumbItem>
               </>
@@ -653,7 +567,7 @@ export function GalleryPage() {
         </div>
 
         {/* Sidebar */}
-        <aside className="sticky top-20 flex w-56 shrink-0 flex-col gap-2 self-stretch">
+        <aside className="sticky top-20 flex w-56 shrink-0 flex-col gap-2 self-start h-[70vh]">
           <Button
             variant="outline"
             size="sm"
@@ -688,6 +602,34 @@ export function GalleryPage() {
                 <Share2 className="mr-2 h-4 w-4" />
               )}
               Share
+            </Button>
+          )}
+          {preferences !== undefined && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              disabled={setHomeFolderPreference.isPending}
+              onClick={() => {
+                setHomeFolderPreference.mutate(
+                  { folderId: currentFolderId ?? null },
+                  {
+                    onSuccess: () => {
+                      queryClient.invalidateQueries(
+                        trpc.user.getPreferences.queryOptions(),
+                      );
+                      toast.success("Home folder updated");
+                    },
+                  },
+                );
+              }}
+            >
+              {setHomeFolderPreference.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Home className="mr-2 h-4 w-4" />
+              )}
+              Set home folder
             </Button>
           )}
           {grantorData && grantorData.grantors.length > 0 && (
