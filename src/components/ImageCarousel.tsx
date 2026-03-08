@@ -1,5 +1,8 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { inferRouterOutputs } from "@trpc/server";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Loader2, RotateCcw, Video } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
@@ -13,7 +16,6 @@ import {
 } from "#/components/ui/carousel";
 import { Skeleton } from "#/components/ui/skeleton";
 import { useTRPC } from "#/integrations/trpc/react";
-import type { driveRouter } from "#/integrations/trpc/routers/drive";
 import { cn } from "#/lib/utils";
 
 // Drive's thumbnailLink ends with =s<size>; replace that to resize.
@@ -102,18 +104,28 @@ function ThumbnailImage({
 }
 
 export function ImageCarousel({
-  files,
   folderId,
   uploadCount = 0,
 }: {
-  files: inferRouterOutputs<typeof driveRouter>["listFiles"];
   folderId?: string;
   uploadCount?: number;
 }) {
-  const photoFiles = files.filter((file) =>
-    file.mimeType?.startsWith("image/"),
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  const {
+    data: mediaPages,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery(
+    trpc.drive.listMedia.infiniteQueryOptions(
+      { folderId },
+      { getNextPageParam: (page) => page.nextCursor ?? undefined },
+    ),
   );
-  const visibleFiles = photoFiles.filter((file) => file.thumbnailLink);
+
+  const files = mediaPages?.pages.flatMap((p) => p.files) ?? [];
+  const visibleFiles = files.filter((f) => f.thumbnailLink);
 
   const [api, setApi] = useState<CarouselApi>();
   const [thumbnailApi, setThumbnailApi] = useState<CarouselApi>();
@@ -129,11 +141,9 @@ export function ImageCarousel({
   useEffect(() => {
     setOptimisticRotations({});
   }, [folderId, uploadCount]);
+
   // Map from fileId -> whether a request is in-flight
   const [inFlight, setInFlight] = useState<Record<string, boolean>>({});
-
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
 
   const rotateImage = useMutation(trpc.mediaEdit.rotateImage.mutationOptions());
 
@@ -156,7 +166,24 @@ export function ImageCarousel({
     });
   }, [thumbnailApi, api]);
 
-  if (photoFiles.length === 0) {
+  // Load next page when carousel approaches the end
+  useEffect(() => {
+    if (!api || !hasNextPage) return;
+
+    const onSelect = () => {
+      const total = api.scrollSnapList().length;
+      if (api.selectedScrollSnap() >= total - 20) {
+        fetchNextPage();
+      }
+    };
+
+    api.on("select", onSelect);
+    return () => {
+      api.off("select", onSelect);
+    };
+  }, [api, hasNextPage, fetchNextPage]);
+
+  if (visibleFiles.length === 0) {
     return null;
   }
 
@@ -186,10 +213,13 @@ export function ImageCarousel({
       rotateImage.mutate(
         { fileId, degrees },
         {
+          onSuccess: () => {
+            setOptimisticRotations((prev) => ({ ...prev, [fileId]: 0 }));
+          },
           onSettled: () => {
             setInFlight((prev) => ({ ...prev, [fileId]: false }));
             queryClient.invalidateQueries({
-              ...trpc.drive.listFiles.queryOptions({ folderId }),
+              queryKey: trpc.drive.listMedia.infiniteQueryKey({ folderId }),
               refetchType: "none",
             });
           },
@@ -230,22 +260,24 @@ export function ImageCarousel({
                   rotateDeg={optimisticRotations[file.id!] ?? 0}
                 />
               )}
-              {i === currentIndex && file.id && (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  disabled={!!inFlight[file.id]}
-                  className="absolute top-2 right-2 z-20 bg-black/50 text-white hover:bg-black/70 hover:text-white disabled:opacity-50"
-                  onClick={() => handleRotateLeft(file.id!)}
-                  aria-label="Rotate left"
-                >
-                  {inFlight[file.id] ? (
-                    <Loader2 className="size-5 animate-spin direction-[reverse]" />
-                  ) : (
-                    <RotateCcw className="size-5" />
-                  )}
-                </Button>
-              )}
+              {i === currentIndex &&
+                file.id &&
+                !file.mimeType?.startsWith("video/") && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    disabled={!!inFlight[file.id]}
+                    className="absolute top-2 right-2 z-20 bg-black/50 text-white hover:bg-black/70 hover:text-white disabled:opacity-50"
+                    onClick={() => handleRotateLeft(file.id!)}
+                    aria-label="Rotate left"
+                  >
+                    {inFlight[file.id] ? (
+                      <Loader2 className="size-5 animate-spin direction-[reverse]" />
+                    ) : (
+                      <RotateCcw className="size-5" />
+                    )}
+                  </Button>
+                )}
             </CarouselItem>
           ))}
         </CarouselContent>

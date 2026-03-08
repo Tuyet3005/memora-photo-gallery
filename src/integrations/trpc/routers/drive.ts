@@ -30,20 +30,45 @@ export const driveRouter = createTRPCRouter({
       return path.slice(1); // Remove root
     }),
 
-  listFiles: protectedProcedure
-    .input(z.object({ folderId: z.string().optional() }).optional())
+  listFolders: protectedProcedure
+    .input(z.object({ folderId: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       const drive = await getAuthedDrive(ctx.session.user.id);
-      const parent = input?.folderId ?? "root";
+      const parent = input.folderId ?? "root";
 
       const res = await drive.files.list({
-        pageSize: 100,
-        fields: "files(id,name,mimeType,thumbnailLink)",
-        orderBy: "folder,name",
-        q: `'${parent}' in parents and trashed = false and (mimeType = 'application/vnd.google-apps.folder' or mimeType contains 'image/' or mimeType contains 'video/')`,
+        fields: "files(id,name,mimeType)",
+        orderBy: "name",
+        q: `'${parent}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`,
       });
 
       return res.data.files ?? [];
+    }),
+
+  listMedia: protectedProcedure
+    .input(
+      z.object({
+        folderId: z.string().optional(),
+        cursor: z.string().optional(),
+        pageSize: z.number().int().min(1).max(100).default(20),
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const drive = await getAuthedDrive(ctx.session.user.id);
+      const parent = input.folderId ?? "root";
+
+      const res = await drive.files.list({
+        pageSize: input.pageSize,
+        pageToken: input.cursor,
+        fields: "nextPageToken,files(id,name,mimeType,thumbnailLink)",
+        orderBy: "name",
+        q: `'${parent}' in parents and trashed = false and (mimeType contains 'image/' or mimeType contains 'video/')`,
+      });
+
+      return {
+        files: res.data.files ?? [],
+        nextCursor: res.data.nextPageToken ?? null,
+      };
     }),
 
   generateUploadUrl: protectedProcedure

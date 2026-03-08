@@ -48,8 +48,6 @@ interface FileUploadEntry {
   error?: string;
 }
 
-const FOLDER_MIME = "application/vnd.google-apps.folder";
-
 function AccountOption({
   image,
   name,
@@ -86,11 +84,11 @@ export function GalleryPage() {
   const currentFolderId = currentFolder.id || undefined;
 
   const {
-    data: files,
+    data: foldersData,
     isPending,
     isFetching,
   } = useQuery({
-    ...trpc.drive.listFiles.queryOptions({ folderId: currentFolderId }),
+    ...trpc.drive.listFolders.queryOptions({ folderId: currentFolderId }),
     enabled: folderStackInitialized,
     refetchOnMount: "always",
     refetchOnWindowFocus: false,
@@ -104,8 +102,10 @@ export function GalleryPage() {
     if (!isFetching) setFetchingFolderId(currentFolderId);
   }, [isFetching, currentFolderId]);
 
-  const visibleFiles =
-    isPending || (folderChanged && isFetching) ? undefined : files;
+  const folders =
+    isPending || (folderChanged && isFetching)
+      ? undefined
+      : (foldersData ?? []);
 
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -249,9 +249,16 @@ export function GalleryPage() {
 
     await Promise.all(files.map(uploadOne));
 
-    await queryClient.invalidateQueries(
-      trpc.drive.listFiles.queryOptions({ folderId: currentFolderId }),
-    );
+    await Promise.all([
+      queryClient.invalidateQueries(
+        trpc.drive.listFolders.queryOptions({ folderId: currentFolderId }),
+      ),
+      queryClient.invalidateQueries({
+        queryKey: trpc.drive.listMedia.infiniteQueryKey({
+          folderId: currentFolderId,
+        }),
+      }),
+    ]);
     setUploadCount((c) => c + 1);
   }
 
@@ -467,38 +474,29 @@ export function GalleryPage() {
       </div>
 
       <div className="mt-6">
-        <ImageCarousel
-          files={visibleFiles ?? []}
-          folderId={currentFolderId}
-          uploadCount={uploadCount}
-        />
+        <ImageCarousel folderId={currentFolderId} uploadCount={uploadCount} />
       </div>
 
-      {visibleFiles === undefined && (
+      {folders === undefined && (
         <div className="flex justify-center py-12">
           <img src="/loading.gif" alt="Loading…" className="w-[60%] max-w-52" />
         </div>
       )}
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {visibleFiles?.map((f) => {
-          const isFolder = f.mimeType === FOLDER_MIME;
-          if (!isFolder) return null;
-
-          return (
-            <button
-              key={f.id}
-              type="button"
-              className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center cursor-pointer hover:bg-(--surface-hover) w-full"
-              onClick={() => openFolder(f.id ?? "", f.name ?? "")}
-            >
-              <Folder className="h-16 w-16 text-(--lagoon-deep)" />
-              <span className="w-full truncate text-xs text-(--sea-ink)">
-                {f.name}
-              </span>
-            </button>
-          );
-        })}
+        {folders?.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            className="flex flex-col items-center gap-2 rounded-xl border border-(--line) bg-(--surface) p-3 text-center cursor-pointer hover:bg-(--surface-hover) w-full"
+            onClick={() => openFolder(f.id ?? "", f.name ?? "")}
+          >
+            <Folder className="h-16 w-16 text-(--lagoon-deep)" />
+            <span className="w-full truncate text-xs text-(--sea-ink)">
+              {f.name}
+            </span>
+          </button>
+        ))}
       </div>
     </main>
   );
