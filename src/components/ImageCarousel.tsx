@@ -30,6 +30,7 @@ function ThumbnailImage({
   fitType = "contain",
   maxWidth,
   rotateDeg = 0,
+  rounded = false,
 }: {
   thumbnailLink: string;
   name: string;
@@ -37,6 +38,7 @@ function ThumbnailImage({
   fitType?: "contain" | "cover";
   maxWidth?: number;
   rotateDeg?: number;
+  rounded?: boolean;
 }) {
   const [fullStarted, setFullStarted] = useState(false);
   const [fullLoaded, setFullLoaded] = useState(false);
@@ -80,7 +82,13 @@ function ThumbnailImage({
           src={lh3Src(thumbnailLink, 20)}
           alt={name}
           style={rotateStyle}
-          className={`select-none absolute inset-0 h-full w-full ${objectFitClass} object-center duration-300 blur-xs ${lowLoaded ? "opacity-100" : "opacity-0"}`}
+          className={cn(
+            "select-none absolute inset-0 h-full mx-auto",
+            rounded && "rounded-lg",
+            objectFitClass,
+            "object-center duration-300 blur-xs",
+            lowLoaded ? "opacity-100" : "opacity-0",
+          )}
           referrerPolicy="no-referrer"
           onLoad={() => {
             setLowLoaded(true);
@@ -94,7 +102,13 @@ function ThumbnailImage({
           src={lh3Src(thumbnailLink, maxWidth)}
           alt={name}
           style={rotateStyle}
-          className={`select-none h-full w-full ${objectFitClass} object-center ${fullLoaded ? "opacity-100" : "opacity-0"}`}
+          className={cn(
+            "select-none h-full mx-auto",
+            rounded && "rounded-lg",
+            objectFitClass,
+            "object-center",
+            fullLoaded ? "opacity-100" : "opacity-0",
+          )}
           referrerPolicy="no-referrer"
           onLoad={() => setTimeout(() => setFullLoaded(true), 300)}
         />
@@ -130,6 +144,7 @@ export function ImageCarousel({
   const [api, setApi] = useState<CarouselApi>();
   const [thumbnailApi, setThumbnailApi] = useState<CarouselApi>();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Map from fileId -> cumulative optimistic rotation in degrees
   const [optimisticRotations, setOptimisticRotations] = useState<
@@ -141,6 +156,14 @@ export function ImageCarousel({
   useEffect(() => {
     setOptimisticRotations({});
   }, [folderId, uploadCount]);
+
+  // Auto-focus the carousel when a new folder is selected and files are available
+  // biome-ignore lint/correctness/useExhaustiveDependencies: folderId is the trigger
+  useEffect(() => {
+    if (visibleFiles.length > 0) {
+      containerRef.current?.focus();
+    }
+  }, [folderId]);
 
   // Map from fileId -> whether a request is in-flight
   const [inFlight, setInFlight] = useState<Record<string, boolean>>({});
@@ -240,6 +263,7 @@ export function ImageCarousel({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: Intended for keyboard navigation
     <div
+      ref={containerRef}
       className="w-full"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: Required to trigger keyup
       tabIndex={0}
@@ -258,6 +282,7 @@ export function ImageCarousel({
                   name={file.name ?? ""}
                   mimeType={file.mimeType ?? ""}
                   rotateDeg={optimisticRotations[file.id!] ?? 0}
+                  rounded
                 />
               )}
               {i === currentIndex &&
@@ -281,8 +306,8 @@ export function ImageCarousel({
             </CarouselItem>
           ))}
         </CarouselContent>
-        <CarouselPrevious />
-        <CarouselNext />
+        <CarouselPrevious className="h-full w-10 shadow rounded-md" />
+        <CarouselNext className="h-full w-10 shadow rounded-md" />
       </Carousel>
       <Carousel
         setApi={setThumbnailApi}
