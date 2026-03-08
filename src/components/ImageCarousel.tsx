@@ -23,6 +23,19 @@ function lh3Src(thumbnailLink: string, size?: number) {
   return thumbnailLink.replace(/=s\d+$/, size ? `=s${size}` : "");
 }
 
+function DriveVideoPlayer({ fileId }: { fileId: string }) {
+  return (
+    <div className="relative h-full w-full">
+      <iframe
+        src={`https://drive.google.com/file/d/${fileId}/preview`}
+        className="h-full w-full rounded-md border-0"
+        allow="autoplay"
+        title="Video player"
+      />
+    </div>
+  );
+}
+
 function ThumbnailImage({
   thumbnailLink,
   name,
@@ -281,15 +294,18 @@ export function ImageCarousel({
         <CarouselContent className="h-[60vh]">
           {visibleFiles.map((file, i) => (
             <CarouselItem key={file.id} className="relative">
-              {Math.abs(i - currentIndex) <= 3 && (
-                <ThumbnailImage
-                  thumbnailLink={file.thumbnailLink!}
-                  name={file.name ?? ""}
-                  mimeType={file.mimeType ?? ""}
-                  rotateDeg={optimisticRotations[file.id!] ?? 0}
-                  rounded
-                />
-              )}
+              {Math.abs(i - currentIndex) <= 3 &&
+                (file.mimeType?.startsWith("video/") && i === currentIndex ? (
+                  <DriveVideoPlayer fileId={file.id!} />
+                ) : (
+                  <ThumbnailImage
+                    thumbnailLink={file.thumbnailLink!}
+                    name={file.name ?? ""}
+                    mimeType={file.mimeType ?? ""}
+                    rotateDeg={optimisticRotations[file.id!] ?? 0}
+                    rounded
+                  />
+                ))}
               {i === currentIndex && file.id && (
                 <div className="absolute top-2 right-2 z-20 flex gap-1">
                   {folderId && onThumbnailSet && file.thumbnailLink && (
