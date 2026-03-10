@@ -80,7 +80,8 @@ function AccountOption({
   );
 }
 
-const YOUR_GALLERY = { id: "", name: "Memora" };
+const MEMORA_ROOT_NAME = "Memora";
+const YOUR_GALLERY = { id: "", name: MEMORA_ROOT_NAME };
 
 function FolderNoteEditorInner({ folderId }: { folderId: string }) {
   const trpc = useTRPC();
@@ -252,7 +253,7 @@ export function GalleryPage() {
 
   // visibleStack: show from root, but skip synthetic root if the real path already starts with the same name
   const visibleStack =
-    folderStack.length > 1 && folderStack[1].name === YOUR_GALLERY.name
+    folderStack.length > 1 && folderStack[1].name === MEMORA_ROOT_NAME
       ? folderStack.slice(1)
       : folderStack;
 
@@ -402,6 +403,8 @@ export function GalleryPage() {
   const ancestorFolders = useMemo(
     () =>
       folderStack
+        // Skip everything up to and including the Memora root folder (+1 for the root, +1 to skip it)
+        .slice(folderStack.findIndex((f) => f.name === MEMORA_ROOT_NAME) + 2)
         .filter((f) => !!f.id)
         .map((f) => ({
           id: f.id,
