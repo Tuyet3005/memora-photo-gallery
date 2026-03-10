@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { UserPlus } from "lucide-react";
+import { LogOut, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { GrantDelegationDialog } from "#/components/GrantDelegationDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "#/components/ui/avatar";
@@ -33,7 +33,20 @@ export default function BetterAuthHeader() {
         </Button>
         <Button
           variant="outline"
+          size="icon"
+          className="sm:hidden"
+          title="Sign out"
+          aria-label="Sign out"
+          onClick={() => {
+            void authClient.signOut();
+          }}
+        >
+          <LogOut className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
           size="sm"
+          className="hidden sm:inline-flex"
           onClick={() => {
             void authClient.signOut();
           }}

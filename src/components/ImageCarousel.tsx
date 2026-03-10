@@ -14,6 +14,12 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "#/components/ui/carousel";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
 import { useTRPC } from "#/integrations/trpc/react";
 import { cn } from "#/lib/utils";
 import { ThumbnailImage } from "./ThumbnailImage";
@@ -38,13 +44,22 @@ export function ImageCarousel({
   currentThumbnailFileId,
   onThumbnailSet,
   readOnly = false,
+  ancestorFolders = [],
 }: {
   folderId?: string;
   shareId?: string;
   uploadCount?: number;
   currentThumbnailFileId?: string | null;
-  onThumbnailSet?: (fileId: string) => void;
+  onThumbnailSet?: (
+    fileId: string,
+    targetFolderId: string,
+  ) => Promise<void> | void;
   readOnly?: boolean;
+  ancestorFolders?: {
+    id: string;
+    name: string;
+    thumbnailFileId?: string | null;
+  }[];
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -116,6 +131,19 @@ export function ImageCarousel({
 
   // Map from fileId -> whether a request is in-flight
   const [inFlight, setInFlight] = useState<Record<string, boolean>>({});
+
+  // Map from folderId -> whether thumbnail set is in-flight
+  const [thumbnailInFlight, setThumbnailInFlight] = useState<
+    Record<string, boolean>
+  >({});
+
+  function handleSetThumbnail(fileId: string, targetFolderId: string) {
+    if (thumbnailInFlight[targetFolderId] || !onThumbnailSet) return;
+    setThumbnailInFlight((prev) => ({ ...prev, [targetFolderId]: true }));
+    Promise.resolve(onThumbnailSet(fileId, targetFolderId)).finally(() => {
+      setThumbnailInFlight((prev) => ({ ...prev, [targetFolderId]: false }));
+    });
+  }
 
   const rotateImage = useMutation(trpc.mediaEdit.rotateImage.mutationOptions());
 
@@ -213,7 +241,7 @@ export function ImageCarousel({
     // biome-ignore lint/a11y/noStaticElementInteractions: Intended for keyboard navigation
     <div
       ref={containerRef}
-      className="w-full"
+      className="w-full outline-none"
       // biome-ignore lint/a11y/noNoninteractiveTabindex: Required to trigger keyup
       tabIndex={0}
       onKeyUp={(e) => {
@@ -226,8 +254,8 @@ export function ImageCarousel({
         opts={{ duration: 20 }}
         className="items-stretch gap-2"
       >
-        <CarouselPrevious className="h-[60vh] w-10 rounded-md shadow" />
-        <CarouselContent className="h-[60vh] min-w-0 flex-1">
+        <CarouselPrevious className="hidden h-[60vh] w-10 rounded-md shadow sm:inline-flex" />
+        <CarouselContent className="h-[52vh] min-w-0 flex-1 sm:h-[60vh]">
           {visibleFiles.map((file, i) => (
             <CarouselItem key={file.id} className="relative">
               {Math.abs(i - currentIndex) <= 3 &&
@@ -244,24 +272,61 @@ export function ImageCarousel({
                 ))}
               {i === currentIndex && file.id && !readOnly && (
                 <div className="absolute top-2 right-2 z-20 flex gap-1">
-                  {folderId && onThumbnailSet && file.thumbnailLink && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="bg-black/50 text-white hover:bg-black/70 hover:text-white"
-                      onClick={() => onThumbnailSet(file.id!)}
-                      aria-label="Set as folder thumbnail"
-                    >
-                      <Star
-                        className="size-5"
-                        fill={
-                          currentThumbnailFileId === file.id
-                            ? "currentColor"
-                            : "none"
-                        }
-                      />
-                    </Button>
-                  )}
+                  {folderId &&
+                    onThumbnailSet &&
+                    file.thumbnailLink &&
+                    ancestorFolders.length > 0 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="bg-black/50 text-white hover:bg-black/70 hover:text-white"
+                            aria-label="Set as folder thumbnail"
+                          >
+                            <Star
+                              className="size-5"
+                              fill={
+                                currentThumbnailFileId === file.id
+                                  ? "currentColor"
+                                  : "none"
+                              }
+                            />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {ancestorFolders.map((folder) => (
+                            <DropdownMenuItem
+                              key={folder.id}
+                              disabled={!!thumbnailInFlight[folder.id]}
+                              onClick={() =>
+                                handleSetThumbnail(file.id!, folder.id)
+                              }
+                              className="flex items-center gap-2"
+                            >
+                              {thumbnailInFlight[folder.id] ? (
+                                <Loader2 className="size-4 shrink-0 animate-spin" />
+                              ) : (
+                                <Star
+                                  className="size-4 shrink-0"
+                                  fill={
+                                    folder.thumbnailFileId === file.id
+                                      ? "currentColor"
+                                      : "none"
+                                  }
+                                />
+                              )}
+                              <span>{folder.name}</span>
+                              {folder.id === folderId && (
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  current
+                                </span>
+                              )}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   {!file.mimeType?.startsWith("video/") && (
                     <Button
                       size="icon"
@@ -283,18 +348,18 @@ export function ImageCarousel({
             </CarouselItem>
           ))}
         </CarouselContent>
-        <CarouselNext className="h-[60vh] w-10 rounded-md shadow" />
+        <CarouselNext className="hidden h-[60vh] w-10 rounded-md shadow sm:inline-flex" />
       </Carousel>
       <Carousel
         setApi={setThumbnailApi}
         opts={{ containScroll: false, dragFree: true }}
       >
-        <CarouselContent className="h-24 mt-4 py-1">
+        <CarouselContent className="mt-3 h-24 px-1 py-1 sm:mt-4 sm:h-24">
           {visibleFiles.map((file, i) => (
             <CarouselItem
               key={file.id}
               className={cn(
-                "p-2 h-full basis-1/12 cursor-pointer rounded-md transition-opacity hover:opacity-100",
+                "h-full basis-1/4 cursor-pointer rounded-md p-1 transition-opacity hover:opacity-100 sm:basis-1/8 md:basis-1/10 lg:basis-1/12",
                 currentIndex === i
                   ? "opacity-100 outline-2 outline-(--lagoon-deep)"
                   : "opacity-80",

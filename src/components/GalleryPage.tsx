@@ -10,7 +10,7 @@ import {
   Upload,
   XCircle,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "#/components/ui/avatar";
 import {
@@ -44,6 +44,7 @@ import {
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
+import { cn } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
 import { ThumbnailImage } from "./ThumbnailImage";
 
@@ -58,13 +59,17 @@ interface FileUploadEntry {
 function AccountOption({
   image,
   name,
+  compact = false,
 }: {
   image: string | null | undefined;
   name: string;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <Avatar className="h-5 w-5 shrink-0">
+    <div
+      className={cn("flex min-w-0 items-center", compact ? "gap-1" : "gap-2")}
+    >
+      <Avatar className={cn(compact ? "h-4 w-4" : "h-5 w-5", "shrink-0")}>
         <AvatarImage src={image ?? undefined} alt="" />
         <AvatarFallback className="text-[10px]">
           {name.charAt(0).toUpperCase()}
@@ -394,8 +399,21 @@ export function GalleryPage() {
     setUploadCount((c) => c + 1);
   }
 
+  const ancestorFolders = useMemo(
+    () =>
+      folderStack
+        .filter((f) => !!f.id)
+        .map((f) => ({
+          id: f.id,
+          name: f.name,
+          thumbnailFileId:
+            f.id === currentFolderId ? currentFolderThumbnailFileId : null,
+        })),
+    [folderStack, currentFolderId, currentFolderThumbnailFileId],
+  );
+
   return (
-    <main className="mx-auto max-w-6xl py-4">
+    <main className="mx-auto max-w-6xl px-8 py-4 sm:px-10">
       <input
         ref={fileInputRef}
         type="file"
@@ -468,12 +486,12 @@ export function GalleryPage() {
                 {i > 0 && <BreadcrumbSeparator key={`sep-${stackIdx}`} />}
                 <BreadcrumbItem key={`item-${stackIdx}`}>
                   {isLast ? (
-                    <BreadcrumbPage className="text-3xl font-bold text-(--sea-ink)">
+                    <BreadcrumbPage className="text-2xl leading-tight font-bold text-(--sea-ink) sm:text-3xl sm:leading-normal">
                       {folder.name}
                     </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink
-                      className="cursor-pointer text-3xl font-bold"
+                      className="cursor-pointer text-2xl leading-tight font-bold sm:text-3xl sm:leading-normal"
                       onClick={() => {
                         const newStack = folderStack.slice(0, stackIdx + 1);
                         setFolderStack(newStack);
@@ -500,31 +518,181 @@ export function GalleryPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mt-6 flex items-stretch gap-24">
+      <div className="mt-6 flex flex-col sm:flex-row sm:items-stretch sm:gap-24">
         <div className="min-w-0 flex-1">
           {folderStackInitialized && (
             <ImageCarousel
               folderId={currentFolderId}
               uploadCount={uploadCount}
               currentThumbnailFileId={currentFolderThumbnailFileId}
-              onThumbnailSet={(fileId) => {
-                if (!currentFolderId) return;
-                setFolderThumbnailMutation.mutate(
-                  { folderId: currentFolderId, fileId },
-                  {
-                    onSuccess: () => {
-                      toast.success("Folder thumbnail updated");
-                      queryClient.invalidateQueries(
-                        trpc.drive.listFolders.queryOptions({
-                          folderId: parentFolderId,
-                        }),
-                      );
+              ancestorFolders={ancestorFolders}
+              onThumbnailSet={(fileId, targetFolderId) => {
+                return new Promise<void>((resolve, reject) => {
+                  const targetParentId =
+                    folderStack[
+                      folderStack.findIndex((f) => f.id === targetFolderId) - 1
+                    ]?.id || undefined;
+                  setFolderThumbnailMutation.mutate(
+                    { folderId: targetFolderId, fileId },
+                    {
+                      onSuccess: () => {
+                        toast.success("Folder thumbnail updated");
+                        queryClient.invalidateQueries(
+                          trpc.drive.listFolders.queryOptions({
+                            folderId: targetParentId,
+                          }),
+                        );
+                        resolve();
+                      },
+                      onError: () => reject(),
                     },
-                  },
-                );
+                  );
+                });
               }}
             />
           )}
+
+          {/* Sidebar shown inline on small screens, hidden on sm+ (shown in aside column instead) */}
+          <aside className="sm:hidden mt-4 grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full min-w-0 justify-start gap-1 px-2"
+              onClick={() => {
+                queryClient.resetQueries(
+                  trpc.drive.listFolders.queryOptions({
+                    folderId: currentFolderId,
+                  }),
+                );
+                queryClient.resetQueries({
+                  queryKey: trpc.drive.listMedia.infiniteQueryKey({
+                    folderId: currentFolderId,
+                  }),
+                });
+              }}
+            >
+              <RefreshCw className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 truncate">Refresh</span>
+            </Button>
+            {currentFolderId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full min-w-0 justify-start gap-1 px-2"
+                disabled={createFolderShare.isPending}
+                onClick={handleShare}
+              >
+                {createFolderShare.isPending ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <Share2 className="h-4 w-4 shrink-0" />
+                )}
+                <span className="min-w-0 truncate">Share</span>
+              </Button>
+            )}
+            {preferences !== undefined && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full min-w-0 justify-start gap-1 px-2"
+                disabled={setHomeFolderPreference.isPending}
+                onClick={() => {
+                  setHomeFolderPreference.mutate(
+                    { folderId: currentFolderId ?? null },
+                    {
+                      onSuccess: () => {
+                        queryClient.invalidateQueries(
+                          trpc.user.getPreferences.queryOptions(),
+                        );
+                        toast.success("Home folder updated");
+                      },
+                    },
+                  );
+                }}
+              >
+                {setHomeFolderPreference.isPending ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <Home className="h-4 w-4 shrink-0" />
+                )}
+                <span className="min-w-0 truncate">Set home folder</span>
+              </Button>
+            )}
+            {grantorData && grantorData.grantors.length > 0 && (
+              <Select
+                value={selectedDelegationId ?? "me"}
+                onValueChange={(val) => {
+                  const newId = val === "me" ? null : val;
+                  setSelectedDelegationId(newId);
+                  setPreference.mutate({ delegationId: newId });
+                }}
+              >
+                <SelectTrigger size="sm" className="w-full min-w-0 gap-1 px-2">
+                  {selectedDelegationId === null ? (
+                    <AccountOption
+                      compact
+                      image={session?.user.image}
+                      name={session?.user.name ?? "Me"}
+                    />
+                  ) : (
+                    (() => {
+                      const g = grantorData.grantors.find(
+                        (x) => x.delegationId === selectedDelegationId,
+                      );
+                      return g ? (
+                        <AccountOption
+                          compact
+                          image={g.grantorImage}
+                          name={g.grantorName}
+                        />
+                      ) : (
+                        <SelectValue placeholder="Upload as…" />
+                      );
+                    })()
+                  )}
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value="me">
+                    <AccountOption
+                      image={session?.user.image}
+                      name={session?.user.name ?? "Me"}
+                    />
+                  </SelectItem>
+                  {grantorData.grantors.map((g) => (
+                    <SelectItem key={g.delegationId} value={g.delegationId}>
+                      <AccountOption
+                        image={g.grantorImage}
+                        name={g.grantorName}
+                      />
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="w-full">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full min-w-0 justify-start gap-1 px-2"
+                    disabled={
+                      uploading || (!!selectedDelegationId && !currentFolderId)
+                    }
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 truncate">Upload</span>
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {selectedDelegationId && !currentFolderId && (
+                <TooltipContent>
+                  You must upload to a folder when using delegation
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </aside>
 
           {folders === undefined && (
             <div className="flex justify-center py-12">
@@ -566,8 +734,8 @@ export function GalleryPage() {
           </div>
         </div>
 
-        {/* Sidebar */}
-        <aside className="sticky top-20 flex w-56 shrink-0 flex-col gap-2 self-start h-[70vh]">
+        {/* Sidebar — hidden on small screens (shown inline above instead) */}
+        <aside className="hidden sm:flex sticky top-20 w-56 shrink-0 flex-col gap-2 self-start h-[70vh]">
           <Button
             variant="outline"
             size="sm"

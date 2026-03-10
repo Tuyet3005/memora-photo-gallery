@@ -68,7 +68,7 @@ export function ThumbnailImage({
           alt={name}
           style={rotateStyle}
           className={cn(
-            "select-none absolute inset-0 h-full mx-auto",
+            "select-none absolute inset-0 h-full w-full",
             rounded && "rounded-lg",
             objectFitClass,
             "object-center duration-300 blur-xs",
@@ -88,7 +88,7 @@ export function ThumbnailImage({
           alt={name}
           style={rotateStyle}
           className={cn(
-            "select-none h-full mx-auto",
+            "select-none h-full w-full",
             rounded && "rounded-lg",
             objectFitClass,
             "object-center",

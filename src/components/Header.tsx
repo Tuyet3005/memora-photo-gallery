@@ -10,7 +10,7 @@ export default function Header() {
             <span className="text-lg font-bold tracking-tight text-(--sea-ink)">
               Memora
             </span>
-            <span className="text-[10px] font-medium tracking-widest text-muted-foreground uppercase">
+            <span className="hidden text-[10px] font-medium tracking-widest text-muted-foreground uppercase sm:inline">
               Memorable photos
             </span>
           </div>
