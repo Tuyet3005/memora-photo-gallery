@@ -221,8 +221,13 @@ export function ImageCarousel({
         else if (e.key === "ArrowRight") api?.scrollNext();
       }}
     >
-      <Carousel setApi={setApi} opts={{ duration: 20 }}>
-        <CarouselContent className="h-[60vh]">
+      <Carousel
+        setApi={setApi}
+        opts={{ duration: 20 }}
+        className="items-stretch gap-2"
+      >
+        <CarouselPrevious className="h-[60vh] w-10 rounded-md shadow" />
+        <CarouselContent className="h-[60vh] min-w-0 flex-1">
           {visibleFiles.map((file, i) => (
             <CarouselItem key={file.id} className="relative">
               {Math.abs(i - currentIndex) <= 3 &&
@@ -278,8 +283,7 @@ export function ImageCarousel({
             </CarouselItem>
           ))}
         </CarouselContent>
-        <CarouselPrevious className="h-full w-10 shadow rounded-md" />
-        <CarouselNext className="h-full w-10 shadow rounded-md" />
+        <CarouselNext className="h-[60vh] w-10 rounded-md shadow" />
       </Carousel>
       <Carousel
         setApi={setThumbnailApi}

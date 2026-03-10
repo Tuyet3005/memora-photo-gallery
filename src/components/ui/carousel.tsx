@@ -118,7 +118,11 @@ function Carousel({
       {/** biome-ignore lint/a11y/useSemanticElements: Library code */}
       <div
         onKeyDownCapture={handleKeyDown}
-        className={cn("relative", className)}
+        className={cn(
+          "flex items-center",
+          orientation === "vertical" ? "flex-col" : "flex-row",
+          className,
+        )}
         role="region"
         aria-roledescription="carousel"
         data-slot="carousel"
@@ -136,7 +140,10 @@ function CarouselContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       ref={carouselRef}
-      className="overflow-hidden"
+      className={cn(
+        "overflow-hidden flex-1",
+        orientation === "vertical" ? "w-full" : "h-full",
+      )}
       data-slot="carousel-content"
     >
       <div
@@ -184,10 +191,8 @@ function CarouselPrevious({
       variant={variant}
       size={size}
       className={cn(
-        "absolute size-8 rounded-full",
-        orientation === "horizontal"
-          ? "top-1/2 -left-12 -translate-y-1/2"
-          : "-top-12 left-1/2 -translate-x-1/2 rotate-90",
+        "shrink-0",
+        orientation === "horizontal" ? "rotate-0" : "rotate-90",
         className,
       )}
       disabled={!canScrollPrev}
@@ -214,10 +219,8 @@ function CarouselNext({
       variant={variant}
       size={size}
       className={cn(
-        "absolute size-8 rounded-full",
-        orientation === "horizontal"
-          ? "top-1/2 -right-12 -translate-y-1/2"
-          : "-bottom-12 left-1/2 -translate-x-1/2 rotate-90",
+        "shrink-0",
+        orientation === "horizontal" ? "rotate-0" : "rotate-90",
         className,
       )}
       disabled={!canScrollNext}
