@@ -149,7 +149,7 @@ export function GalleryPage() {
 
   // folderStack always has YOUR_GALLERY as index 0
   const [folderStack, setFolderStack] = useState<
-    { id: string; name: string }[]
+    { id: string; name: string; canEdit?: boolean }[]
   >(() => {
     if (search.folder && search.name) {
       return [YOUR_GALLERY, { id: search.folder, name: search.name }];
@@ -299,8 +299,8 @@ export function GalleryPage() {
     );
   }
 
-  function openFolder(id: string, name: string) {
-    setFolderStack((prev) => [...prev, { id, name }]);
+  function openFolder(id: string, name: string, canEdit?: boolean) {
+    setFolderStack((prev) => [...prev, { id, name, canEdit }]);
     const isHome = id === preferences?.homeFolderId;
     navigate({
       to: "/",
@@ -405,7 +405,7 @@ export function GalleryPage() {
       folderStack
         // Skip everything up to and including the Memora root folder (+1 for the root, +1 to skip it)
         .slice(folderStack.findIndex((f) => f.name === MEMORA_ROOT_NAME) + 2)
-        .filter((f) => !!f.id)
+        .filter((f) => !!f.id && f.canEdit !== false)
         .map((f) => ({
           id: f.id,
           name: f.name,
@@ -713,7 +713,7 @@ export function GalleryPage() {
                 key={f.id}
                 type="button"
                 className="relative overflow-hidden rounded-xl border border-(--line) bg-(--surface) cursor-pointer hover:opacity-90 w-full aspect-square"
-                onClick={() => openFolder(f.id ?? "", f.name ?? "")}
+                onClick={() => openFolder(f.id ?? "", f.name ?? "", f.canEdit)}
               >
                 {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
                   <ThumbnailImage

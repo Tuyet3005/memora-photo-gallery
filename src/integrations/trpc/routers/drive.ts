@@ -16,17 +16,21 @@ export const driveRouter = createTRPCRouter({
     .input(z.object({ folderId: z.string() }))
     .query(async ({ ctx, input }) => {
       const drive = await getAuthedDrive(ctx.session.user.id);
-      const path: { id: string; name: string }[] = [];
+      const path: { id: string; name: string; canEdit: boolean }[] = [];
       let currentId = input.folderId;
 
       for (let i = 0; i < 20; i++) {
         const res = await drive.files.get({
           fileId: currentId,
-          fields: "id,name,parents",
+          fields: "id,name,parents,capabilities(canEdit)",
         });
         const file = res.data;
         if (!file.id || !file.name) break;
-        path.unshift({ id: file.id, name: file.name });
+        path.unshift({
+          id: file.id,
+          name: file.name,
+          canEdit: file.capabilities?.canEdit ?? false,
+        });
         const parentId = file.parents?.[0];
         if (!parentId) break;
         currentId = parentId;
@@ -42,7 +46,7 @@ export const driveRouter = createTRPCRouter({
       const parent = input.folderId ?? "root";
 
       const res = await drive.files.list({
-        fields: "files(id,name,mimeType)",
+        fields: "files(id,name,mimeType,capabilities(canEdit))",
         orderBy: "name",
         q: `'${parent}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`,
       });
@@ -64,6 +68,7 @@ export const driveRouter = createTRPCRouter({
 
       return files.map((f) => ({
         ...f,
+        canEdit: f.capabilities?.canEdit ?? false,
         thumbnail: f.id ? (thumbnailMap[f.id] ?? null) : null,
       }));
     }),
@@ -75,7 +80,18 @@ export const driveRouter = createTRPCRouter({
         fileId: z.string(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const drive = await getAuthedDrive(ctx.session.user.id);
+      const folderRes = await drive.files.get({
+        fileId: input.folderId,
+        fields: "capabilities(canEdit)",
+      });
+      if (!folderRes.data.capabilities?.canEdit) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have edit permission for this folder",
+        });
+      }
       const now = new Date();
       await db
         .insert(folderThumbnail)
