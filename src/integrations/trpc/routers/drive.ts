@@ -155,6 +155,26 @@ export const driveRouter = createTRPCRouter({
       };
     }),
 
+  createFolder: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1),
+        parentFolderId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const drive = await getAuthedDrive(ctx.session.user.id);
+      const res = await drive.files.create({
+        requestBody: {
+          name: input.name,
+          mimeType: "application/vnd.google-apps.folder",
+          parents: input.parentFolderId ? [input.parentFolderId] : undefined,
+        },
+        fields: "id,name",
+      });
+      return { id: res.data.id!, name: res.data.name! };
+    }),
+
   generateUploadUrl: protectedProcedure
     .input(
       z.object({

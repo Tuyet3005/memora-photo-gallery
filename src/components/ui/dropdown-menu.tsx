@@ -1,4 +1,9 @@
-import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CircleIcon,
+} from "lucide-react";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import type * as React from "react";
 
@@ -19,13 +24,35 @@ function DropdownMenuPortal({
 }
 
 function DropdownMenuTrigger({
+  className,
+  children,
+  asChild,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
+  if (asChild) {
+    return (
+      <DropdownMenuPrimitive.Trigger
+        data-slot="dropdown-menu-trigger"
+        asChild
+        className={className}
+        {...props}
+      >
+        {children}
+      </DropdownMenuPrimitive.Trigger>
+    );
+  }
   return (
     <DropdownMenuPrimitive.Trigger
       data-slot="dropdown-menu-trigger"
+      className={cn(
+        "inline-flex w-fit shrink-0 items-center gap-2 rounded-md border bg-background text-sm font-medium whitespace-nowrap shadow-xs transition-all outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[size=sm]:h-8 data-[size=sm]:px-3 data-[size=sm]:has-[>svg]:px-2.5 data-[size=default]:h-9 data-[size=default]:px-4 dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+        className,
+      )}
       {...props}
-    />
+    >
+      {children}
+      <ChevronDownIcon className="ml-auto size-4 opacity-50" />
+    </DropdownMenuPrimitive.Trigger>
   );
 }
 

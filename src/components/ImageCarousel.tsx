@@ -359,7 +359,7 @@ export function ImageCarousel({
             <CarouselItem
               key={file.id}
               className={cn(
-                "h-full basis-1/4 cursor-pointer rounded-md p-1 transition-opacity hover:opacity-100 sm:basis-1/8 md:basis-1/10 lg:basis-1/12",
+                "h-full w-20 shrink-0 basis-auto cursor-pointer rounded-md p-1 transition-opacity hover:opacity-100",
                 currentIndex === i
                   ? "opacity-100 outline-2 outline-(--lagoon-deep)"
                   : "opacity-80",

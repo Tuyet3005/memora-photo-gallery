@@ -3,14 +3,16 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   CheckCircle2,
   Folder,
+  FolderPlus,
   Home,
   Loader2,
+  Plus,
   RefreshCw,
   Share2,
   Upload,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "#/components/ui/avatar";
 import {
@@ -25,9 +27,17 @@ import { Button } from "#/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "#/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
+import { Input } from "#/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -44,7 +54,6 @@ import {
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
-import { cn } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
 import { ThumbnailImage } from "./ThumbnailImage";
 
@@ -59,17 +68,13 @@ interface FileUploadEntry {
 function AccountOption({
   image,
   name,
-  compact = false,
 }: {
   image: string | null | undefined;
   name: string;
-  compact?: boolean;
 }) {
   return (
-    <div
-      className={cn("flex min-w-0 items-center", compact ? "gap-1" : "gap-2")}
-    >
-      <Avatar className={cn(compact ? "h-4 w-4" : "h-5 w-5", "shrink-0")}>
+    <div className="flex min-w-0 items-center gap-2">
+      <Avatar className="size-4 shrink-0">
         <AvatarImage src={image ?? undefined} alt="" />
         <AvatarFallback className="text-[10px]">
           {name.charAt(0).toUpperCase()}
@@ -203,6 +208,8 @@ export function GalleryPage() {
   const [uploadCount, setUploadCount] = useState(0);
   const [uploadEntries, setUploadEntries] = useState<FileUploadEntry[]>([]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
   const [selectedDelegationId, setSelectedDelegationId] = useState<
     string | null
   >(null);
@@ -283,6 +290,28 @@ export function GalleryPage() {
   const createFolderShare = useMutation(
     trpc.share.createFolderShare.mutationOptions(),
   );
+
+  const createFolder = useMutation(trpc.drive.createFolder.mutationOptions());
+
+  function handleCreateFolder(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newFolderName.trim();
+    if (!name) return;
+    createFolder.mutate(
+      { name, parentFolderId: currentFolderId },
+      {
+        onSuccess: () => {
+          toast.success("Folder created");
+          setNewFolderDialogOpen(false);
+          setNewFolderName("");
+          queryClient.invalidateQueries(
+            trpc.drive.listFolders.queryOptions({ folderId: currentFolderId }),
+          );
+        },
+        onError: () => toast.error("Failed to create folder"),
+      },
+    );
+  }
 
   function handleShare() {
     if (!currentFolderId) return;
@@ -478,6 +507,33 @@ export function GalleryPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={newFolderDialogOpen} onOpenChange={setNewFolderDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>New folder</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateFolder}>
+            <Input
+              autoFocus
+              placeholder="Folder name"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+            />
+            <DialogFooter className="mt-4">
+              <Button
+                type="submit"
+                disabled={!newFolderName.trim() || createFolder.isPending}
+              >
+                {createFolder.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Create
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <Breadcrumb className="w-full">
         <BreadcrumbList>
           {visibleStack.map((folder, i) => {
@@ -485,9 +541,9 @@ export function GalleryPage() {
             // Find the real index in folderStack to slice correctly on navigate
             const stackIdx = folderStack.indexOf(folder);
             return (
-              <>
-                {i > 0 && <BreadcrumbSeparator key={`sep-${stackIdx}`} />}
-                <BreadcrumbItem key={`item-${stackIdx}`}>
+              <Fragment key={stackIdx}>
+                {i > 0 && <BreadcrumbSeparator />}
+                <BreadcrumbItem>
                   {isLast ? (
                     <BreadcrumbPage className="text-2xl leading-tight font-bold text-(--sea-ink) sm:text-3xl sm:leading-normal">
                       {folder.name}
@@ -515,7 +571,7 @@ export function GalleryPage() {
                     </BreadcrumbLink>
                   )}
                 </BreadcrumbItem>
-              </>
+              </Fragment>
             );
           })}
         </BreadcrumbList>
@@ -633,7 +689,6 @@ export function GalleryPage() {
                 <SelectTrigger size="sm" className="w-full min-w-0 gap-1 px-2">
                   {selectedDelegationId === null ? (
                     <AccountOption
-                      compact
                       image={session?.user.image}
                       name={session?.user.name ?? "Me"}
                     />
@@ -644,7 +699,6 @@ export function GalleryPage() {
                       );
                       return g ? (
                         <AccountOption
-                          compact
                           image={g.grantorImage}
                           name={g.grantorName}
                         />
@@ -672,29 +726,57 @@ export function GalleryPage() {
                 </SelectContent>
               </Select>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="w-full">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full min-w-0 justify-start gap-1 px-2"
-                    disabled={
-                      uploading || (!!selectedDelegationId && !currentFolderId)
-                    }
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="h-4 w-4 shrink-0" />
-                    <span className="min-w-0 truncate">Upload</span>
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {selectedDelegationId && !currentFolderId && (
-                <TooltipContent>
-                  You must upload to a folder when using delegation
-                </TooltipContent>
-              )}
-            </Tooltip>
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="w-full">
+                    <DropdownMenuTrigger
+                      data-size="sm"
+                      className="w-full min-w-0 justify-start gap-1 px-2"
+                      disabled={
+                        uploading ||
+                        (!!selectedDelegationId && !currentFolderId)
+                      }
+                      asChild
+                    >
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full min-w-0 gap-1 px-2"
+                      >
+                        <Plus className="size-4" />
+                        <span className="min-w-0 truncate">Add</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </span>
+                </TooltipTrigger>
+                {selectedDelegationId && !currentFolderId && (
+                  <TooltipContent>
+                    You must upload to a folder when using delegation
+                  </TooltipContent>
+                )}
+              </Tooltip>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={
+                    uploading || (!!selectedDelegationId && !currentFolderId)
+                  }
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload />
+                  Upload files
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setNewFolderName("");
+                    setNewFolderDialogOpen(true);
+                  }}
+                >
+                  <FolderPlus />
+                  New folder
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </aside>
 
           {folders === undefined && (
@@ -852,29 +934,49 @@ export function GalleryPage() {
               </SelectContent>
             </Select>
           )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start"
-                  disabled={
-                    uploading || (!!selectedDelegationId && !currentFolderId)
-                  }
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {selectedDelegationId && !currentFolderId && (
-              <TooltipContent>
-                You must upload to a folder when using delegation
-              </TooltipContent>
-            )}
-          </Tooltip>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <DropdownMenuTrigger
+                    data-size="sm"
+                    className="w-full justify-start"
+                    disabled={
+                      uploading || (!!selectedDelegationId && !currentFolderId)
+                    }
+                  >
+                    <Plus className="size-4" />
+                    Add
+                  </DropdownMenuTrigger>
+                </span>
+              </TooltipTrigger>
+              {selectedDelegationId && !currentFolderId && (
+                <TooltipContent>
+                  You must upload to a folder when using delegation
+                </TooltipContent>
+              )}
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={
+                  uploading || (!!selectedDelegationId && !currentFolderId)
+                }
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-4 w-4" />
+                Upload files
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  setNewFolderName("");
+                  setNewFolderDialogOpen(true);
+                }}
+              >
+                <FolderPlus className="h-4 w-4" />
+                New folder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {currentFolderId && canEditNotes && (
             <FolderNoteEditor folderId={currentFolderId} />
           )}
