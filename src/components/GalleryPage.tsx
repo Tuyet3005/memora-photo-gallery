@@ -735,9 +735,10 @@ export function GalleryPage() {
                         uploading ||
                         (!!selectedDelegationId && !currentFolderId)
                       }
-                      className="block"
+                      data-size="sm"
+                      className="w-full min-w-0 justify-start gap-1 px-2"
                     >
-                      <Plus className="size-4 mr-2 shrink-0" />
+                      <Plus className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 truncate">Add</span>
                     </DropdownMenuTrigger>
                   </span>
