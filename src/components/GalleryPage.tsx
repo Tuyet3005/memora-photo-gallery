@@ -123,12 +123,12 @@ function FolderNoteEditorInner({ folderId }: { folderId: string }) {
   return (
     <div className="relative mt-2 flex-1">
       <Textarea
-        className="resize-none h-52 sm:h-full"
+        className="h-52 resize-none sm:h-full"
         placeholder="Notes…"
         value={value}
         onChange={handleChange}
       />
-      <div className="absolute bottom-2 right-2 text-muted-foreground">
+      <div className="absolute right-2 bottom-2 text-muted-foreground">
         {pending || updateNote.isPending ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
         ) : updateNote.isSuccess ? (
@@ -545,12 +545,12 @@ export function GalleryPage() {
                 {i > 0 && <BreadcrumbSeparator />}
                 <BreadcrumbItem>
                   {isLast ? (
-                    <BreadcrumbPage className="text-2xl leading-tight font-bold text-(--sea-ink) sm:text-3xl sm:leading-normal">
+                    <BreadcrumbPage className="font-bold text-(--sea-ink) text-2xl leading-tight sm:text-3xl sm:leading-normal">
                       {folder.name}
                     </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink
-                      className="cursor-pointer text-2xl leading-tight font-bold sm:text-3xl sm:leading-normal"
+                      className="cursor-pointer font-bold text-2xl leading-tight sm:text-3xl sm:leading-normal"
                       onClick={() => {
                         const newStack = folderStack.slice(0, stackIdx + 1);
                         setFolderStack(newStack);
@@ -612,7 +612,7 @@ export function GalleryPage() {
           )}
         </div>
 
-        <aside className="grid grid-cols-2 gap-2 [grid-area:actions] lg:sticky lg:top-20 lg:flex h-full pb-2 lg:flex-col lg:gap-2 lg:self-start">
+        <aside className="grid h-full grid-cols-2 gap-2 pb-2 [grid-area:actions] lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-2 lg:self-start">
           <Button
             variant="outline"
             size="sm"
@@ -792,7 +792,7 @@ export function GalleryPage() {
             <button
               key={f.id}
               type="button"
-              className="relative overflow-hidden rounded-xl border border-(--line) bg-(--surface) cursor-pointer hover:opacity-90 w-full aspect-square"
+              className="relative aspect-square w-full cursor-pointer overflow-hidden rounded-xl border border-(--line) bg-(--surface) hover:opacity-90"
               onClick={() => openFolder(f.id ?? "", f.name ?? "", f.canEdit)}
             >
               {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
@@ -807,8 +807,8 @@ export function GalleryPage() {
                   <Folder className="h-16 w-16 text-(--lagoon-deep)" />
                 </div>
               )}
-              <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-2 py-1.5">
-                <span className="block h-10 w-full text-sm leading-5 font-medium text-white line-clamp-2">
+              <div className="absolute right-0 bottom-0 left-0 bg-black/40 px-2 py-1.5">
+                <span className="line-clamp-2 block h-10 w-full font-medium text-sm text-white leading-5">
                   {f.name}
                 </span>
               </div>

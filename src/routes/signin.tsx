@@ -12,18 +12,18 @@ function SignIn() {
   }
 
   return (
-    <main className="page-wrap flex items-center justify-center px-4 pb-8 pt-14">
+    <main className="page-wrap flex items-center justify-center px-4 pt-14 pb-8">
       <div className="island-shell rise-in w-full max-w-sm rounded-[2rem] px-8 py-10">
-        <h1 className="mb-2 text-2xl font-bold tracking-tight text-[var(--sea-ink)]">
+        <h1 className="mb-2 font-bold text-2xl text-[var(--sea-ink)] tracking-tight">
           Sign in
         </h1>
-        <p className="mb-8 text-sm text-[var(--sea-ink-soft)]">
+        <p className="mb-8 text-[var(--sea-ink-soft)] text-sm">
           Sign in to your Memora account.
         </p>
         <button
           type="button"
           onClick={handleGoogleSignIn}
-          className="flex w-full items-center justify-center gap-3 rounded-full cursor-pointer border border-[rgba(23,58,64,0.2)] bg-white/50 px-5 py-2.5 text-sm font-semibold text-[var(--sea-ink)] transition hover:-translate-y-0.5 hover:border-[rgba(23,58,64,0.35)]"
+          className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-full border border-[rgba(23,58,64,0.2)] bg-white/50 px-5 py-2.5 font-semibold text-[var(--sea-ink)] text-sm transition hover:-translate-y-0.5 hover:border-[rgba(23,58,64,0.35)]"
         >
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
             <path

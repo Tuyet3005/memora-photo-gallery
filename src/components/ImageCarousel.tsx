@@ -318,7 +318,7 @@ export function ImageCarousel({
                               )}
                               <span>{folder.name}</span>
                               {folder.id === folderId && (
-                                <span className="ml-auto text-xs text-muted-foreground">
+                                <span className="ml-auto text-muted-foreground text-xs">
                                   current
                                 </span>
                               )}
@@ -337,7 +337,7 @@ export function ImageCarousel({
                       aria-label="Rotate left"
                     >
                       {inFlight[file.id] ? (
-                        <Loader2 className="size-5 animate-spin direction-[reverse]" />
+                        <Loader2 className="direction-[reverse] size-5 animate-spin" />
                       ) : (
                         <RotateCcw className="size-5" />
                       )}
@@ -361,7 +361,7 @@ export function ImageCarousel({
               className={cn(
                 "h-full w-20 shrink-0 basis-auto cursor-pointer rounded-md p-1 transition-opacity hover:opacity-100",
                 currentIndex === i
-                  ? "opacity-100 outline-2 outline-(--lagoon-deep)"
+                  ? "opacity-100 outline-(--lagoon-deep) outline-2"
                   : "opacity-80",
               )}
               onClick={() => {

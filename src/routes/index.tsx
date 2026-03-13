@@ -41,8 +41,8 @@ function FeatureCard({
       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-(--sand) text-(--lagoon-deep)">
         {icon}
       </div>
-      <h3 className="text-base font-semibold text-(--sea-ink)">{title}</h3>
-      <p className="text-sm leading-relaxed text-(--sea-ink-soft)">
+      <h3 className="font-semibold text-(--sea-ink) text-base">{title}</h3>
+      <p className="text-(--sea-ink-soft) text-sm leading-relaxed">
         {description}
       </p>
     </div>
@@ -58,21 +58,21 @@ function LandingPage() {
         className="pointer-events-none absolute inset-0 overflow-hidden"
       >
         <div className="absolute -top-32 left-1/2 h-130 w-130 -translate-x-1/2 rounded-full bg-(--hero-a) blur-[96px]" />
-        <div className="absolute -right-24 top-60 h-95 w-95 rounded-full bg-(--hero-b) blur-[80px]" />
+        <div className="absolute top-60 -right-24 h-95 w-95 rounded-full bg-(--hero-b) blur-[80px]" />
         <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-(--hero-a) opacity-50 blur-[80px]" />
       </div>
 
       {/* Hero */}
-      <section className="relative mx-auto flex max-w-4xl flex-col items-center px-6 pb-24 pt-24 text-center sm:pt-32">
+      <section className="relative mx-auto flex max-w-4xl flex-col items-center px-6 pt-24 pb-24 text-center sm:pt-32">
         {/* Kicker */}
-        <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-(--chip-line) bg-(--chip-bg) px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-(--kicker) shadow-sm backdrop-blur-sm">
+        <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-(--chip-line) bg-(--chip-bg) px-4 py-1.5 font-semibold text-(--kicker) text-xs uppercase tracking-widest shadow-sm backdrop-blur-sm">
           <span className="h-1.5 w-1.5 rounded-full bg-(--lagoon)" />
           Your memories, beautifully preserved
         </span>
 
         {/* Heading */}
         <h1
-          className="mb-6 text-5xl font-bold leading-[1.1] tracking-tight text-(--sea-ink) sm:text-6xl lg:text-7xl"
+          className="mb-6 font-bold text-(--sea-ink) text-5xl leading-[1.1] tracking-tight sm:text-6xl lg:text-7xl"
           style={{ fontFamily: "'Fraunces', serif" }}
         >
           A gallery for every{" "}
@@ -92,7 +92,7 @@ function LandingPage() {
         </h1>
 
         {/* Sub-heading */}
-        <p className="mb-10 max-w-2xl text-lg leading-relaxed text-(--sea-ink-soft) sm:text-xl">
+        <p className="mb-10 max-w-2xl text-(--sea-ink-soft) text-lg leading-relaxed sm:text-xl">
           Memora lets you organise, revisit, and share your photo memories in a
           clean, private gallery — no algorithms, no noise, just your story.
         </p>
@@ -101,7 +101,7 @@ function LandingPage() {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Button
             size="lg"
-            className="rounded-full px-8 text-base font-semibold shadow-lg shadow-[rgba(79,184,178,0.25)] transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[rgba(79,184,178,0.35)]"
+            className="rounded-full px-8 font-semibold text-base shadow-[rgba(79,184,178,0.25)] shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-[rgba(79,184,178,0.35)] hover:shadow-xl"
             style={{
               background: "linear-gradient(135deg, #4fb8b2 0%, #328f97 100%)",
               color: "#fff",
@@ -114,7 +114,7 @@ function LandingPage() {
           <Button
             variant="outline"
             size="lg"
-            className="rounded-full border-(--chip-line) bg-(--chip-bg) px-8 text-base font-semibold text-(--sea-ink) backdrop-blur-sm transition-all hover:-translate-y-0.5"
+            className="rounded-full border-(--chip-line) bg-(--chip-bg) px-8 font-semibold text-(--sea-ink) text-base backdrop-blur-sm transition-all hover:-translate-y-0.5"
             asChild
           >
             <Link to="/signin">Sign in</Link>
@@ -122,7 +122,7 @@ function LandingPage() {
         </div>
 
         {/* Social proof hint */}
-        <p className="mt-8 text-sm text-(--sea-ink-soft)">
+        <p className="mt-8 text-(--sea-ink-soft) text-sm">
           Private by default &middot; No ads &middot; Always yours
         </p>
       </section>
@@ -259,7 +259,7 @@ function LandingPage() {
       <section className="relative mx-auto max-w-3xl px-6 pb-32">
         <div className="flex flex-col items-center gap-6 rounded-3xl border border-(--line) bg-(--surface-strong) px-8 py-14 text-center shadow-lg backdrop-blur-md">
           <h2
-            className="text-3xl font-bold text-(--sea-ink) sm:text-4xl"
+            className="font-bold text-(--sea-ink) text-3xl sm:text-4xl"
             style={{ fontFamily: "'Fraunces', serif" }}
           >
             Start building your gallery today.
@@ -270,7 +270,7 @@ function LandingPage() {
           </p>
           <Button
             size="lg"
-            className="rounded-full px-10 text-base font-semibold shadow-lg shadow-[rgba(79,184,178,0.25)] transition-all hover:-translate-y-0.5"
+            className="rounded-full px-10 font-semibold text-base shadow-[rgba(79,184,178,0.25)] shadow-lg transition-all hover:-translate-y-0.5"
             style={{
               background: "linear-gradient(135deg, #4fb8b2 0%, #328f97 100%)",
               color: "#fff",

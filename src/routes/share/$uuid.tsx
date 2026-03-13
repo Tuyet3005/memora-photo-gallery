@@ -30,7 +30,7 @@ function SharePage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
-      <h1 className="mb-6 text-3xl font-bold text-(--sea-ink)">
+      <h1 className="mb-6 font-bold text-(--sea-ink) text-3xl">
         Shared gallery
       </h1>
       <ImageCarousel shareId={uuid} readOnly />

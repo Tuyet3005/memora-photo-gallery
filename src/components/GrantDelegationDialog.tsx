@@ -89,7 +89,7 @@ export function GrantDelegationDialog({
 
         {step === "input" && (
           <div className="flex flex-col gap-4">
-            <p className="text-sm text-(--sea-ink-soft)">
+            <p className="text-(--sea-ink-soft) text-sm">
               Enter the email of the user you want to allow to upload to your
               Google Drive.
             </p>
@@ -106,7 +106,7 @@ export function GrantDelegationDialog({
               }}
             />
             {errorMessage && (
-              <p className="text-sm text-red-500">{errorMessage}</p>
+              <p className="text-red-500 text-sm">{errorMessage}</p>
             )}
             <Button
               disabled={!email || findByEmail.isPending}
@@ -127,15 +127,15 @@ export function GrantDelegationDialog({
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-(--sea-ink)">
+                <p className="truncate font-medium text-(--sea-ink) text-sm">
                   {previewUser.name}
                 </p>
-                <p className="truncate text-xs text-(--sea-ink-soft)">
+                <p className="truncate text-(--sea-ink-soft) text-xs">
                   {previewUser.email}
                 </p>
               </div>
             </div>
-            <p className="text-sm text-(--sea-ink-soft)">
+            <p className="text-(--sea-ink-soft) text-sm">
               This user will be able to upload files to your Google Drive.
             </p>
             <div className="flex gap-2">
@@ -159,7 +159,7 @@ export function GrantDelegationDialog({
 
         {step === "success" && previewUser && (
           <div className="flex flex-col gap-4">
-            <p className="text-sm text-(--sea-ink)">
+            <p className="text-(--sea-ink) text-sm">
               <span className="font-medium">{previewUser.name}</span> can now
               upload files to your Google Drive.
             </p>
@@ -169,7 +169,7 @@ export function GrantDelegationDialog({
 
         {step === "error" && (
           <div className="flex flex-col gap-4">
-            <p className="text-sm text-red-500">
+            <p className="text-red-500 text-sm">
               {errorMessage ?? "Something went wrong."}
             </p>
             <div className="flex gap-2">
