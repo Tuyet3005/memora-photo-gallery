@@ -151,11 +151,15 @@ export function GalleryPage() {
   );
   const navigate = useNavigate();
   const search = useSearch({ from: "/" });
+  const isDriveRootRequested = search.root === true;
 
   // folderStack always has YOUR_GALLERY as index 0
   const [folderStack, setFolderStack] = useState<
     { id: string; name: string; canEdit?: boolean }[]
   >(() => {
+    if (search.root) {
+      return [YOUR_GALLERY];
+    }
     if (search.folder && search.name) {
       return [YOUR_GALLERY, { id: search.folder, name: search.name }];
     }
@@ -234,13 +238,18 @@ export function GalleryPage() {
     ...trpc.drive.getFolderPath.queryOptions({
       folderId: search.folder ?? "",
     }),
-    enabled: !!search.folder,
+    enabled: !!search.folder && !isDriveRootRequested,
   });
 
   // Initialize folderStack from home folder on first load
   useEffect(() => {
     if (folderStackInitialized) return;
     if (!preferences) return;
+    if (isDriveRootRequested) {
+      setFolderStackInitialized(true);
+      setFolderStack([YOUR_GALLERY]);
+      return;
+    }
     if (preferences.homeFolderId && !homeFolderPath) return; // wait for path
     // If URL specifies a folder, wait for its path before initializing
     if (search.folder && !urlFolderPath) return;
@@ -255,8 +264,14 @@ export function GalleryPage() {
     homeFolderPath,
     urlFolderPath,
     folderStackInitialized,
+    isDriveRootRequested,
     search.folder,
   ]);
+
+  useEffect(() => {
+    if (!folderStackInitialized || !isDriveRootRequested) return;
+    setFolderStack([YOUR_GALLERY]);
+  }, [folderStackInitialized, isDriveRootRequested]);
 
   // visibleStack: show from root, but skip synthetic root if the real path already starts with the same name
   const visibleStack =
@@ -333,7 +348,7 @@ export function GalleryPage() {
     const isHome = id === preferences?.homeFolderId;
     navigate({
       to: "/",
-      search: isHome ? {} : { name, folder: id },
+      search: isHome ? {} : { name, folder: id, root: undefined },
       replace: false,
     });
   }
@@ -559,7 +574,11 @@ export function GalleryPage() {
                         if (top.id && !topIsHome) {
                           navigate({
                             to: "/",
-                            search: { name: top.name, folder: top.id },
+                            search: {
+                              name: top.name,
+                              folder: top.id,
+                              root: undefined,
+                            },
                             replace: false,
                           });
                         } else {
@@ -577,7 +596,7 @@ export function GalleryPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'media''actions''content'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-24 lg:[grid-template-areas:'media_actions''content_content']">
+      <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'content''media''actions'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-24 lg:[grid-template-areas:'content_content''media_actions']">
         <div className="min-w-0 [grid-area:media]">
           {folderStackInitialized && (
             <ImageCarousel

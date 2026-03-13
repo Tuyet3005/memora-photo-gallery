@@ -8,6 +8,7 @@ export const Route = createFileRoute("/")({
   validateSearch: z.object({
     name: z.string().optional(),
     folder: z.string().optional(),
+    root: z.boolean().optional(),
   }),
   head: ({ match }) => ({
     meta: [
