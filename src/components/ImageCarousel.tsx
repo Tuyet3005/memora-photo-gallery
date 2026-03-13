@@ -25,6 +25,25 @@ import { cn } from "#/lib/utils";
 import { ThumbnailImage } from "./ThumbnailImage";
 
 const CAROUSEL_THUMBNAIL_SIZE = 100;
+const CAROUSEL_DATETIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+function formatMediaDateTime(value?: string | null) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return CAROUSEL_DATETIME_FORMATTER.format(date);
+}
+
+function getViewportMaxImageSize() {
+  if (typeof window === "undefined") return undefined;
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  return Math.ceil(Math.max(window.innerWidth, window.innerHeight) * dpr);
+}
 
 function DriveVideoPlayer({ fileId }: { fileId: string }) {
   return (
@@ -110,7 +129,23 @@ export function ImageCarousel({
   const [api, setApi] = useState<CarouselApi>();
   const [thumbnailApi, setThumbnailApi] = useState<CarouselApi>();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [fullImageMaxWidth, setFullImageMaxWidth] = useState<
+    number | undefined
+  >(getViewportMaxImageSize);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const updateMaxWidth = () => {
+      setFullImageMaxWidth(getViewportMaxImageSize());
+    };
+
+    updateMaxWidth();
+    window.addEventListener("resize", updateMaxWidth);
+
+    return () => {
+      window.removeEventListener("resize", updateMaxWidth);
+    };
+  }, []);
 
   // Map from fileId -> cumulative optimistic rotation in degrees
   const [optimisticRotations, setOptimisticRotations] = useState<
@@ -295,6 +330,7 @@ export function ImageCarousel({
                     thumbnailLink={file.thumbnailLink!}
                     name={file.name ?? ""}
                     mimeType={file.mimeType ?? ""}
+                    maxWidth={fullImageMaxWidth}
                     rotateDeg={optimisticRotations[file.id!] ?? 0}
                     rounded
                     showBlurBackdrop
@@ -312,7 +348,7 @@ export function ImageCarousel({
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="bg-black/50 text-white hover:bg-black/70 hover:text-white"
+                            className="border border-white/15 bg-black/65 text-white backdrop-blur-md hover:bg-black/80 hover:text-white"
                             aria-label="Set as folder thumbnail"
                           >
                             <Star
@@ -363,7 +399,7 @@ export function ImageCarousel({
                       size="icon"
                       variant="ghost"
                       disabled={!!inFlight[file.id]}
-                      className="bg-black/50 text-white hover:bg-black/70 hover:text-white disabled:opacity-50"
+                      className="border border-white/15 bg-black/65 text-white backdrop-blur-md hover:bg-black/80 hover:text-white disabled:opacity-50"
                       onClick={() => handleRotateLeft(file.id!)}
                       aria-label="Rotate left"
                     >
@@ -376,6 +412,12 @@ export function ImageCarousel({
                   )}
                 </div>
               )}
+              {i === currentIndex &&
+                formatMediaDateTime(file.modifiedTime ?? file.createdTime) && (
+                  <div className="absolute bottom-2 left-6 z-20 rounded-md bg-black px-2 py-1 text-white text-xs">
+                    {formatMediaDateTime(file.modifiedTime ?? file.createdTime)}
+                  </div>
+                )}
             </CarouselItem>
           ))}
         </CarouselContent>
