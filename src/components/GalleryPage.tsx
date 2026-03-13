@@ -151,12 +151,16 @@ export function GalleryPage() {
   );
   const navigate = useNavigate();
   const search = useSearch({ from: "/" });
+  const isHomeRequested = search.home === true;
   const isDriveRootRequested = search.root === true;
 
   // folderStack always has YOUR_GALLERY as index 0
   const [folderStack, setFolderStack] = useState<
     { id: string; name: string; canEdit?: boolean }[]
   >(() => {
+    if (search.home) {
+      return [YOUR_GALLERY];
+    }
     if (search.root) {
       return [YOUR_GALLERY];
     }
@@ -245,6 +249,14 @@ export function GalleryPage() {
   useEffect(() => {
     if (folderStackInitialized) return;
     if (!preferences) return;
+    if (isHomeRequested) {
+      if (preferences.homeFolderId && !homeFolderPath) return;
+      setFolderStackInitialized(true);
+      setFolderStack(
+        homeFolderPath ? [YOUR_GALLERY, ...homeFolderPath] : [YOUR_GALLERY],
+      );
+      return;
+    }
     if (isDriveRootRequested) {
       setFolderStackInitialized(true);
       setFolderStack([YOUR_GALLERY]);
@@ -264,9 +276,18 @@ export function GalleryPage() {
     homeFolderPath,
     urlFolderPath,
     folderStackInitialized,
+    isHomeRequested,
     isDriveRootRequested,
     search.folder,
   ]);
+
+  useEffect(() => {
+    if (!folderStackInitialized || !isHomeRequested || !preferences) return;
+    if (preferences.homeFolderId && !homeFolderPath) return;
+    setFolderStack(
+      homeFolderPath ? [YOUR_GALLERY, ...homeFolderPath] : [YOUR_GALLERY],
+    );
+  }, [folderStackInitialized, homeFolderPath, isHomeRequested, preferences]);
 
   useEffect(() => {
     if (!folderStackInitialized || !isDriveRootRequested) return;
@@ -348,7 +369,9 @@ export function GalleryPage() {
     const isHome = id === preferences?.homeFolderId;
     navigate({
       to: "/",
-      search: isHome ? {} : { name, folder: id, root: undefined },
+      search: isHome
+        ? {}
+        : { home: undefined, name, folder: id, root: undefined },
       replace: false,
     });
   }
@@ -576,6 +599,7 @@ export function GalleryPage() {
                           navigate({
                             to: "/",
                             search: {
+                              home: undefined,
                               name: top.name,
                               folder: top.id,
                               root: undefined,
