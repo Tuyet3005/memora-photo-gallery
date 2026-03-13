@@ -622,7 +622,7 @@ export function GalleryPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'content''media''actions'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-24 lg:[grid-template-areas:'content_content''media_actions']">
+      <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'content''media''actions'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-8 lg:[grid-template-areas:'content_content''media_actions']">
         <div className="min-w-0 [grid-area:media]">
           {folderStackInitialized && (
             <ImageCarousel
@@ -828,39 +828,41 @@ export function GalleryPage() {
           </div>
         )}
 
-        <div className="mt-2 grid grid-cols-3 gap-4 [grid-area:content] md:grid-cols-4 lg:mt-6 lg:grid-cols-5">
-          {folders?.map((f) => (
-            <button
-              key={f.shortcutId ?? f.id}
-              type="button"
-              className="relative aspect-square w-full cursor-pointer overflow-hidden rounded-xl border border-(--line) bg-(--surface) hover:opacity-90"
-              onClick={() => openFolder(f.id ?? "", f.name ?? "", f.canEdit)}
-            >
-              {f.isShortcut && (
-                <div className="absolute top-1 right-1 z-10 rounded-lg bg-black/50 p-1 text-white">
-                  <Link className="size-3.5" />
+        {folders && folders.length > 0 && (
+          <div className="mt-2 grid grid-cols-3 gap-4 [grid-area:content] md:grid-cols-4 lg:mt-6 lg:grid-cols-5">
+            {folders.map((f) => (
+              <button
+                key={f.shortcutId ?? f.id}
+                type="button"
+                className="relative aspect-square w-full cursor-pointer overflow-hidden rounded-xl border border-(--line) bg-(--surface) hover:opacity-90"
+                onClick={() => openFolder(f.id ?? "", f.name ?? "", f.canEdit)}
+              >
+                {f.isShortcut && (
+                  <div className="absolute top-1 right-1 z-10 rounded-lg bg-black/50 p-1 text-white">
+                    <Link className="size-3.5" />
+                  </div>
+                )}
+                {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
+                  <ThumbnailImage
+                    thumbnailLink={folderThumbnailLinks[f.thumbnail.fileId]!}
+                    name={f.name ?? ""}
+                    mimeType="image/"
+                    fitType="cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Folder className="size-16 text-(--lagoon-deep)" />
+                  </div>
+                )}
+                <div className="absolute right-0 bottom-0 left-0 bg-black/40 px-2 py-1.5">
+                  <span className="line-clamp-2 block h-8 w-full font-medium text-white text-xs leading-4">
+                    {f.name}
+                  </span>
                 </div>
-              )}
-              {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
-                <ThumbnailImage
-                  thumbnailLink={folderThumbnailLinks[f.thumbnail.fileId]!}
-                  name={f.name ?? ""}
-                  mimeType="image/"
-                  fitType="cover"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Folder className="size-16 text-(--lagoon-deep)" />
-                </div>
-              )}
-              <div className="absolute right-0 bottom-0 left-0 bg-black/40 px-2 py-1.5">
-                <span className="line-clamp-2 block h-8 w-full font-medium text-white text-xs leading-4">
-                  {f.name}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );
