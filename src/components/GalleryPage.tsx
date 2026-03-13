@@ -686,7 +686,10 @@ export function GalleryPage() {
                   setPreference.mutate({ delegationId: newId });
                 }}
               >
-                <SelectTrigger size="sm" className="w-full min-w-0 gap-1 px-2">
+                <SelectTrigger
+                  size="sm"
+                  className="w-full min-w-0 justify-start"
+                >
                   {selectedDelegationId === null ? (
                     <AccountOption
                       image={session?.user.image}
@@ -736,7 +739,7 @@ export function GalleryPage() {
                         (!!selectedDelegationId && !currentFolderId)
                       }
                       data-size="sm"
-                      className="w-full min-w-0 justify-start gap-1 px-2"
+                      className="w-full min-w-0 justify-start gap-0.5 px-1.5"
                     >
                       <Plus className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 truncate">Add</span>
@@ -887,7 +890,7 @@ export function GalleryPage() {
                 setPreference.mutate({ delegationId: newId });
               }}
             >
-              <SelectTrigger size="sm" className="w-full">
+              <SelectTrigger size="sm" className="w-full justify-start">
                 {selectedDelegationId === null ? (
                   <AccountOption
                     image={session?.user.image}
@@ -932,12 +935,12 @@ export function GalleryPage() {
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger
                   data-size="sm"
-                  className="w-full justify-start gap-1"
+                  className="w-full justify-start"
                   disabled={
                     uploading || (!!selectedDelegationId && !currentFolderId)
                   }
                 >
-                  <Plus className="size-4 mr-2" />
+                  <Plus className="h-4 w-4 mr-2" />
                   <span>Add</span>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
