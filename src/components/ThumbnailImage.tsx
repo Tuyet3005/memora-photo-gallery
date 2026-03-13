@@ -53,14 +53,14 @@ export function ThumbnailImage({
       : { transition: "transform 0.3s ease" };
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-md">
+    <div className="relative size-full overflow-hidden rounded-md">
       {mimeType.startsWith("video/") && (
         <div className="absolute top-1 right-1 z-10 rounded-sm bg-black/70 p-0.5">
           <Video className="size-4 text-white" />
         </div>
       )}
       {!lowLoaded && !fullLoaded && (
-        <Skeleton className="absolute inset-0 h-full w-full" />
+        <Skeleton className="absolute inset-0 size-full" />
       )}
       {!fullLoaded && (
         <img
@@ -68,7 +68,7 @@ export function ThumbnailImage({
           alt={name}
           style={rotateStyle}
           className={cn(
-            "absolute inset-0 h-full w-full select-none",
+            "absolute inset-0 size-full select-none",
             rounded && "rounded-lg",
             objectFitClass,
             "object-center blur-xs duration-300",
@@ -88,7 +88,7 @@ export function ThumbnailImage({
           alt={name}
           style={rotateStyle}
           className={cn(
-            "h-full w-full select-none",
+            "size-full select-none",
             rounded && "rounded-lg",
             objectFitClass,
             "object-center",

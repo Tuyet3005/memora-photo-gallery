@@ -26,10 +26,10 @@ import { ThumbnailImage } from "./ThumbnailImage";
 
 function DriveVideoPlayer({ fileId }: { fileId: string }) {
   return (
-    <div className="relative h-full w-full">
+    <div className="relative size-full">
       <iframe
         src={`https://drive.google.com/file/d/${fileId}/preview`}
-        className="h-full w-full rounded-md border-0"
+        className="size-full rounded-md border-0"
         allow="autoplay"
         title="Video player"
       />

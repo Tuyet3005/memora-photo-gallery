@@ -120,7 +120,7 @@ export function GrantDelegationDialog({
         {step === "preview" && previewUser && (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3 rounded-lg border border-(--line) bg-(--surface) p-3">
-              <Avatar className="h-10 w-10">
+              <Avatar className="size-10">
                 <AvatarImage src={previewUser.image ?? undefined} alt="" />
                 <AvatarFallback className="text-xs">
                   {previewUser.name.charAt(0).toUpperCase()}

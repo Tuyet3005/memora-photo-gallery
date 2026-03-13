@@ -11,13 +11,13 @@ export default function BetterAuthHeader() {
   const [delegationDialogOpen, setDelegationDialogOpen] = useState(false);
 
   if (isPending) {
-    return <Avatar className="h-8 w-8 animate-pulse" />;
+    return <Avatar className="size-8 animate-pulse" />;
   }
 
   if (session?.user) {
     return (
       <div className="flex items-center gap-2">
-        <Avatar className="h-8 w-8">
+        <Avatar className="size-8">
           <AvatarImage src={session.user.image ?? undefined} alt="" />
           <AvatarFallback className="text-xs">
             {session.user.name?.charAt(0).toUpperCase() || "U"}
@@ -29,7 +29,7 @@ export default function BetterAuthHeader() {
           title="Grant upload access"
           onClick={() => setDelegationDialogOpen(true)}
         >
-          <UserPlus className="h-4 w-4" />
+          <UserPlus className="size-4" />
         </Button>
         <Button
           variant="outline"
@@ -41,7 +41,7 @@ export default function BetterAuthHeader() {
             void authClient.signOut();
           }}
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="size-4" />
         </Button>
         <Button
           variant="outline"

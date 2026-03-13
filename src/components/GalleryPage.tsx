@@ -130,9 +130,9 @@ function FolderNoteEditorInner({ folderId }: { folderId: string }) {
       />
       <div className="absolute right-2 bottom-2 text-muted-foreground">
         {pending || updateNote.isPending ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <Loader2 className="size-3.5 animate-spin" />
         ) : updateNote.isSuccess ? (
-          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+          <CheckCircle2 className="size-3.5 text-green-500" />
         ) : null}
       </div>
     </div>
@@ -475,13 +475,13 @@ export function GalleryPage() {
               <li key={entry.name} className="flex items-start gap-2 text-sm">
                 {(entry.status === "pending" ||
                   entry.status === "retrying") && (
-                  <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                  <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" />
                 )}
                 {entry.status === "done" && (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-500" />
                 )}
                 {entry.status === "error" && (
-                  <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                  <XCircle className="mt-0.5 size-4 shrink-0 text-red-500" />
                 )}
                 <div className="min-w-0">
                   <p className="truncate font-medium">{entry.name}</p>
@@ -525,7 +525,7 @@ export function GalleryPage() {
                 disabled={!newFolderName.trim() || createFolder.isPending}
               >
                 {createFolder.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 size-4 animate-spin" />
                 )}
                 Create
               </Button>
@@ -630,7 +630,7 @@ export function GalleryPage() {
               });
             }}
           >
-            <RefreshCw className="h-4 w-4 shrink-0" />
+            <RefreshCw className="size-4 shrink-0" />
             <span className="min-w-0 truncate">Refresh</span>
           </Button>
           {currentFolderId && (
@@ -642,9 +642,9 @@ export function GalleryPage() {
               onClick={handleShare}
             >
               {createFolderShare.isPending ? (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                <Loader2 className="size-4 shrink-0 animate-spin" />
               ) : (
-                <Share2 className="h-4 w-4 shrink-0" />
+                <Share2 className="size-4 shrink-0" />
               )}
               <span className="min-w-0 truncate">Share</span>
             </Button>
@@ -670,9 +670,9 @@ export function GalleryPage() {
               }}
             >
               {setHomeFolderPreference.isPending ? (
-                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                <Loader2 className="size-4 shrink-0 animate-spin" />
               ) : (
-                <Home className="h-4 w-4 shrink-0" />
+                <Home className="size-4 shrink-0" />
               )}
               <span className="min-w-0 truncate">Set home folder</span>
             </Button>
@@ -737,7 +737,7 @@ export function GalleryPage() {
                     data-size="sm"
                     className="w-full min-w-0"
                   >
-                    <Plus className="h-4 w-4 shrink-0" />
+                    <Plus className="size-4 shrink-0" />
                     <span className="min-w-0 truncate">Add</span>
                   </DropdownMenuTrigger>
                 </span>
@@ -804,7 +804,7 @@ export function GalleryPage() {
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Folder className="h-16 w-16 text-(--lagoon-deep)" />
+                  <Folder className="size-16 text-(--lagoon-deep)" />
                 </div>
               )}
               <div className="absolute right-0 bottom-0 left-0 bg-black/40 px-2 py-1.5">

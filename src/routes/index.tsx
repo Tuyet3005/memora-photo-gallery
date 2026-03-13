@@ -38,7 +38,7 @@ function FeatureCard({
 }) {
   return (
     <div className="group relative flex flex-col gap-3 rounded-2xl border border-(--line) bg-(--surface) p-6 shadow-sm backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-(--chip-line) hover:shadow-md">
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-(--sand) text-(--lagoon-deep)">
+      <div className="flex size-11 items-center justify-center rounded-xl bg-(--sand) text-(--lagoon-deep)">
         {icon}
       </div>
       <h3 className="font-semibold text-(--sea-ink) text-base">{title}</h3>
@@ -57,16 +57,16 @@ function LandingPage() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 overflow-hidden"
       >
-        <div className="absolute -top-32 left-1/2 h-130 w-130 -translate-x-1/2 rounded-full bg-(--hero-a) blur-[96px]" />
-        <div className="absolute top-60 -right-24 h-95 w-95 rounded-full bg-(--hero-b) blur-[80px]" />
-        <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-(--hero-a) opacity-50 blur-[80px]" />
+        <div className="absolute -top-32 left-1/2 size-130 -translate-x-1/2 rounded-full bg-(--hero-a) blur-[96px]" />
+        <div className="absolute top-60 -right-24 size-95 rounded-full bg-(--hero-b) blur-[80px]" />
+        <div className="absolute bottom-0 left-0 size-80 rounded-full bg-(--hero-a) opacity-50 blur-[80px]" />
       </div>
 
       {/* Hero */}
       <section className="relative mx-auto flex max-w-4xl flex-col items-center px-6 pt-24 pb-24 text-center sm:pt-32">
         {/* Kicker */}
         <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-(--chip-line) bg-(--chip-bg) px-4 py-1.5 font-semibold text-(--kicker) text-xs uppercase tracking-widest shadow-sm backdrop-blur-sm">
-          <span className="h-1.5 w-1.5 rounded-full bg-(--lagoon)" />
+          <span className="size-1.5 rounded-full bg-(--lagoon)" />
           Your memories, beautifully preserved
         </span>
 
