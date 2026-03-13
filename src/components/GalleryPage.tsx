@@ -356,6 +356,7 @@ export function GalleryPage() {
   const uploading = uploadEntries.some(
     (e) => e.status === "pending" || e.status === "retrying",
   );
+  const isDelegatedAtRoot = !!selectedDelegationId && !currentFolderId;
 
   async function uploadOne(file: File): Promise<void> {
     const MAX_ATTEMPTS = 3;
@@ -746,37 +747,33 @@ export function GalleryPage() {
             </Select>
           )}
           <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="w-full">
-                  <DropdownMenuTrigger
-                    disabled={
-                      uploading || (!!selectedDelegationId && !currentFolderId)
-                    }
-                    data-size="sm"
-                    className="w-full min-w-0"
-                  >
-                    <Plus className="size-4 shrink-0" />
-                    <span className="min-w-0 truncate">Add</span>
-                  </DropdownMenuTrigger>
-                </span>
-              </TooltipTrigger>
-              {selectedDelegationId && !currentFolderId && (
-                <TooltipContent>
-                  You must upload to a folder when using delegation
-                </TooltipContent>
-              )}
-            </Tooltip>
+            <span className="w-full">
+              <DropdownMenuTrigger data-size="sm" className="w-full min-w-0">
+                <Plus className="size-4 shrink-0" />
+                <span className="min-w-0 truncate">Add</span>
+              </DropdownMenuTrigger>
+            </span>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={
-                  uploading || (!!selectedDelegationId && !currentFolderId)
-                }
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload />
-                Upload files
-              </DropdownMenuItem>
+              {isDelegatedAtRoot ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <DropdownMenuItem disabled>
+                        <Upload />
+                        Upload files
+                      </DropdownMenuItem>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    You must upload to a folder when using delegation
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                  <Upload />
+                  Upload files
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => {
                   setNewFolderName("");
@@ -806,7 +803,7 @@ export function GalleryPage() {
           </div>
         )}
 
-        <div className="mt-2 grid grid-cols-2 gap-4 [grid-area:content] sm:grid-cols-3 md:grid-cols-4 lg:mt-6 lg:grid-cols-5">
+        <div className="mt-2 grid grid-cols-3 gap-4 [grid-area:content] md:grid-cols-4 lg:mt-6 lg:grid-cols-5">
           {folders?.map((f) => (
             <button
               key={f.id}
@@ -827,7 +824,7 @@ export function GalleryPage() {
                 </div>
               )}
               <div className="absolute right-0 bottom-0 left-0 bg-black/40 px-2 py-1.5">
-                <span className="line-clamp-2 block h-10 w-full font-medium text-sm text-white leading-5">
+                <span className="line-clamp-2 block h-8 w-full font-medium text-white text-xs leading-4">
                   {f.name}
                 </span>
               </div>
