@@ -70,6 +70,7 @@ export function ImageCarousel({
     data: authenticatedPages,
     fetchNextPage: fetchNextAuthenticated,
     hasNextPage: hasNextAuthenticated,
+    isFetchingNextPage: isFetchingNextAuthenticated,
   } = useInfiniteQuery({
     ...trpc.drive.listMedia.infiniteQueryOptions(
       { folderId },
@@ -83,6 +84,7 @@ export function ImageCarousel({
     data: sharedPages,
     fetchNextPage: fetchNextShared,
     hasNextPage: hasNextShared,
+    isFetchingNextPage: isFetchingNextShared,
   } = useInfiniteQuery({
     ...trpc.share.listSharedMedia.infiniteQueryOptions(
       { shareId: shareId ?? "" },
@@ -98,6 +100,9 @@ export function ImageCarousel({
   const mediaPages = shareId ? sharedPages : authenticatedPages;
   const fetchNextPage = shareId ? fetchNextShared : fetchNextAuthenticated;
   const hasNextPage = shareId ? hasNextShared : hasNextAuthenticated;
+  const isFetchingNextPage = shareId
+    ? isFetchingNextShared
+    : isFetchingNextAuthenticated;
 
   const files = mediaPages?.pages.flatMap((p) => p.files) ?? [];
   const visibleFiles = files.filter((f) => f.thumbnailLink);
@@ -184,6 +189,28 @@ export function ImageCarousel({
       api.off("select", onSelect);
     };
   }, [api, hasNextPage, fetchNextPage]);
+
+  // Load next page while the thumbnail carousel is being scrolled near the end.
+  useEffect(() => {
+    if (!thumbnailApi || !hasNextPage) return;
+
+    const maybeFetchNext = () => {
+      if (isFetchingNextPage) return;
+
+      // Embla reports progress from 0..1; fetch when near the tail.
+      if (thumbnailApi.scrollProgress() >= 0.8) {
+        fetchNextPage();
+      }
+    };
+
+    thumbnailApi.on("scroll", maybeFetchNext);
+    thumbnailApi.on("settle", maybeFetchNext);
+
+    return () => {
+      thumbnailApi.off("scroll", maybeFetchNext);
+      thumbnailApi.off("settle", maybeFetchNext);
+    };
+  }, [thumbnailApi, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   if (visibleFiles.length === 0) {
     return null;
