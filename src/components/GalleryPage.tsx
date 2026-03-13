@@ -73,8 +73,8 @@ function AccountOption({
   name: string;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <Avatar className="size-4 shrink-0">
+    <div className="flex min-w-0 items-center gap-1">
+      <Avatar className="size-4 sm:mr-2 shrink-0">
         <AvatarImage src={image ?? undefined} alt="" />
         <AvatarFallback className="text-[10px]">
           {name.charAt(0).toUpperCase()}
@@ -731,22 +731,14 @@ export function GalleryPage() {
                 <TooltipTrigger asChild>
                   <span className="w-full">
                     <DropdownMenuTrigger
-                      data-size="sm"
-                      className="w-full min-w-0 justify-start gap-1 px-2"
                       disabled={
                         uploading ||
                         (!!selectedDelegationId && !currentFolderId)
                       }
-                      asChild
+                      className="block"
                     >
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full min-w-0 gap-1 px-2"
-                      >
-                        <Plus className="size-4" />
-                        <span className="min-w-0 truncate">Add</span>
-                      </Button>
+                      <Plus className="size-4 mr-2 shrink-0" />
+                      <span className="min-w-0 truncate">Add</span>
                     </DropdownMenuTrigger>
                   </span>
                 </TooltipTrigger>
@@ -937,18 +929,16 @@ export function GalleryPage() {
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span>
-                  <DropdownMenuTrigger
-                    data-size="sm"
-                    className="w-full justify-start"
-                    disabled={
-                      uploading || (!!selectedDelegationId && !currentFolderId)
-                    }
-                  >
-                    <Plus className="size-4" />
-                    Add
-                  </DropdownMenuTrigger>
-                </span>
+                <DropdownMenuTrigger
+                  data-size="sm"
+                  className="w-full justify-start gap-1"
+                  disabled={
+                    uploading || (!!selectedDelegationId && !currentFolderId)
+                  }
+                >
+                  <Plus className="size-4 mr-2" />
+                  <span>Add</span>
+                </DropdownMenuTrigger>
               </TooltipTrigger>
               {selectedDelegationId && !currentFolderId && (
                 <TooltipContent>
