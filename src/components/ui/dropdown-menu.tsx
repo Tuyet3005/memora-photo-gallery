@@ -45,7 +45,7 @@ function DropdownMenuTrigger({
     <DropdownMenuPrimitive.Trigger
       data-slot="dropdown-menu-trigger"
       className={cn(
-        "inline-flex w-fit shrink-0 items-center justify-center gap-2 rounded-md border bg-background text-sm font-medium whitespace-nowrap shadow-xs transition-all outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[size=sm]:h-8 data-[size=sm]:gap-1.5 data-[size=sm]:px-3 data-[size=sm]:has-[>svg]:px-2.5 data-[size=default]:h-9 data-[size=default]:px-4 data-[size=default]:has-[>svg]:px-3",
+        "inline-flex w-fit shrink-0 items-center justify-center gap-1 lg:gap-1.5 rounded-md border bg-background text-sm font-medium whitespace-nowrap shadow-xs transition-all outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[size=sm]:h-8 data-[size=sm]:gap-1.5 data-[size=sm]:px-3 data-[size=sm]:has-[>svg]:px-2.5 data-[size=default]:h-9 data-[size=default]:px-4 data-[size=default]:has-[>svg]:px-3",
         className,
       )}
       {...props}

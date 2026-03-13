@@ -73,15 +73,15 @@ function AccountOption({
   name: string;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-1">
-      <Avatar className="size-4 sm:mr-2 shrink-0">
+    <>
+      <Avatar className="size-4 shrink-0">
         <AvatarImage src={image ?? undefined} alt="" />
         <AvatarFallback className="text-[10px]">
           {name.charAt(0).toUpperCase()}
         </AvatarFallback>
       </Avatar>
       <span className="truncate font-medium">{name}</span>
-    </div>
+    </>
   );
 }
 
@@ -123,7 +123,7 @@ function FolderNoteEditorInner({ folderId }: { folderId: string }) {
   return (
     <div className="relative mt-2 flex-1">
       <Textarea
-        className="resize-none h-full"
+        className="resize-none h-52 sm:h-full"
         placeholder="Notes…"
         value={value}
         onChange={handleChange}
@@ -577,8 +577,8 @@ export function GalleryPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mt-6 flex flex-col sm:flex-row sm:items-stretch sm:gap-24">
-        <div className="min-w-0 flex-1">
+      <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'media''actions''content'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-24 lg:[grid-template-areas:'media_actions''content_content']">
+        <div className="min-w-0 [grid-area:media]">
           {folderStackInitialized && (
             <ImageCarousel
               folderId={currentFolderId}
@@ -610,217 +610,13 @@ export function GalleryPage() {
               }}
             />
           )}
-
-          {/* Sidebar shown inline on small screens, hidden on sm+ (shown in aside column instead) */}
-          <aside className="sm:hidden mt-4 grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full min-w-0 justify-start gap-1 px-2"
-              onClick={() => {
-                queryClient.resetQueries(
-                  trpc.drive.listFolders.queryOptions({
-                    folderId: currentFolderId,
-                  }),
-                );
-                queryClient.resetQueries({
-                  queryKey: trpc.drive.listMedia.infiniteQueryKey({
-                    folderId: currentFolderId,
-                  }),
-                });
-              }}
-            >
-              <RefreshCw className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 truncate">Refresh</span>
-            </Button>
-            {currentFolderId && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full min-w-0 justify-start gap-1 px-2"
-                disabled={createFolderShare.isPending}
-                onClick={handleShare}
-              >
-                {createFolderShare.isPending ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <Share2 className="h-4 w-4 shrink-0" />
-                )}
-                <span className="min-w-0 truncate">Share</span>
-              </Button>
-            )}
-            {preferences !== undefined && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full min-w-0 justify-start gap-1 px-2"
-                disabled={setHomeFolderPreference.isPending}
-                onClick={() => {
-                  setHomeFolderPreference.mutate(
-                    { folderId: currentFolderId ?? null },
-                    {
-                      onSuccess: () => {
-                        queryClient.invalidateQueries(
-                          trpc.user.getPreferences.queryOptions(),
-                        );
-                        toast.success("Home folder updated");
-                      },
-                    },
-                  );
-                }}
-              >
-                {setHomeFolderPreference.isPending ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-                ) : (
-                  <Home className="h-4 w-4 shrink-0" />
-                )}
-                <span className="min-w-0 truncate">Set home folder</span>
-              </Button>
-            )}
-            {grantorData && grantorData.grantors.length > 0 && (
-              <Select
-                value={selectedDelegationId ?? "me"}
-                onValueChange={(val) => {
-                  const newId = val === "me" ? null : val;
-                  setSelectedDelegationId(newId);
-                  setPreference.mutate({ delegationId: newId });
-                }}
-              >
-                <SelectTrigger
-                  size="sm"
-                  className="w-full min-w-0 justify-start"
-                >
-                  {selectedDelegationId === null ? (
-                    <AccountOption
-                      image={session?.user.image}
-                      name={session?.user.name ?? "Me"}
-                    />
-                  ) : (
-                    (() => {
-                      const g = grantorData.grantors.find(
-                        (x) => x.delegationId === selectedDelegationId,
-                      );
-                      return g ? (
-                        <AccountOption
-                          image={g.grantorImage}
-                          name={g.grantorName}
-                        />
-                      ) : (
-                        <SelectValue placeholder="Upload as…" />
-                      );
-                    })()
-                  )}
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectItem value="me">
-                    <AccountOption
-                      image={session?.user.image}
-                      name={session?.user.name ?? "Me"}
-                    />
-                  </SelectItem>
-                  {grantorData.grantors.map((g) => (
-                    <SelectItem key={g.delegationId} value={g.delegationId}>
-                      <AccountOption
-                        image={g.grantorImage}
-                        name={g.grantorName}
-                      />
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="w-full">
-                    <DropdownMenuTrigger
-                      disabled={
-                        uploading ||
-                        (!!selectedDelegationId && !currentFolderId)
-                      }
-                      data-size="sm"
-                      className="w-full min-w-0 justify-start gap-0.5 px-1.5"
-                    >
-                      <Plus className="h-4 w-4 shrink-0" />
-                      <span className="min-w-0 truncate">Add</span>
-                    </DropdownMenuTrigger>
-                  </span>
-                </TooltipTrigger>
-                {selectedDelegationId && !currentFolderId && (
-                  <TooltipContent>
-                    You must upload to a folder when using delegation
-                  </TooltipContent>
-                )}
-              </Tooltip>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  disabled={
-                    uploading || (!!selectedDelegationId && !currentFolderId)
-                  }
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload />
-                  Upload files
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setNewFolderName("");
-                    setNewFolderDialogOpen(true);
-                  }}
-                >
-                  <FolderPlus />
-                  New folder
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </aside>
-
-          {folders === undefined && (
-            <div className="flex justify-center py-12">
-              <img
-                src="/loading.gif"
-                alt="Loading…"
-                className="w-[60%] max-w-52"
-              />
-            </div>
-          )}
-
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {folders?.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                className="relative overflow-hidden rounded-xl border border-(--line) bg-(--surface) cursor-pointer hover:opacity-90 w-full aspect-square"
-                onClick={() => openFolder(f.id ?? "", f.name ?? "", f.canEdit)}
-              >
-                {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
-                  <ThumbnailImage
-                    thumbnailLink={folderThumbnailLinks[f.thumbnail.fileId]!}
-                    name={f.name ?? ""}
-                    mimeType="image/"
-                    fitType="cover"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Folder className="h-16 w-16 text-(--lagoon-deep)" />
-                  </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-2 py-1.5">
-                  <span className="block h-10 w-full text-sm leading-5 font-medium text-white line-clamp-2">
-                    {f.name}
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* Sidebar — hidden on small screens (shown inline above instead) */}
-        <aside className="hidden sm:flex sticky top-20 w-56 shrink-0 flex-col gap-2 self-start h-[70vh]">
+        <aside className="grid grid-cols-2 gap-2 [grid-area:actions] lg:sticky lg:top-20 lg:flex h-full pb-2 lg:flex-col lg:gap-2 lg:self-start">
           <Button
             variant="outline"
             size="sm"
-            className="w-full justify-start"
+            className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
             onClick={() => {
               queryClient.resetQueries(
                 trpc.drive.listFolders.queryOptions({
@@ -834,30 +630,30 @@ export function GalleryPage() {
               });
             }}
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
+            <RefreshCw className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 truncate">Refresh</span>
           </Button>
           {currentFolderId && (
             <Button
               variant="outline"
               size="sm"
-              className="w-full justify-start"
+              className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
               disabled={createFolderShare.isPending}
               onClick={handleShare}
             >
               {createFolderShare.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
               ) : (
-                <Share2 className="mr-2 h-4 w-4" />
+                <Share2 className="h-4 w-4 shrink-0" />
               )}
-              Share
+              <span className="min-w-0 truncate">Share</span>
             </Button>
           )}
           {preferences !== undefined && (
             <Button
               variant="outline"
               size="sm"
-              className="w-full justify-start"
+              className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
               disabled={setHomeFolderPreference.isPending}
               onClick={() => {
                 setHomeFolderPreference.mutate(
@@ -874,11 +670,11 @@ export function GalleryPage() {
               }}
             >
               {setHomeFolderPreference.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
               ) : (
-                <Home className="mr-2 h-4 w-4" />
+                <Home className="h-4 w-4 shrink-0" />
               )}
-              Set home folder
+              <span className="min-w-0 truncate">Set home folder</span>
             </Button>
           )}
           {grantorData && grantorData.grantors.length > 0 && (
@@ -890,7 +686,7 @@ export function GalleryPage() {
                 setPreference.mutate({ delegationId: newId });
               }}
             >
-              <SelectTrigger size="sm" className="w-full justify-start">
+              <SelectTrigger size="sm" className="w-full min-w-0 justify-start">
                 {selectedDelegationId === null ? (
                   <AccountOption
                     image={session?.user.image}
@@ -933,16 +729,18 @@ export function GalleryPage() {
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
-                <DropdownMenuTrigger
-                  data-size="sm"
-                  className="w-full justify-start"
-                  disabled={
-                    uploading || (!!selectedDelegationId && !currentFolderId)
-                  }
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  <span>Add</span>
-                </DropdownMenuTrigger>
+                <span className="w-full">
+                  <DropdownMenuTrigger
+                    disabled={
+                      uploading || (!!selectedDelegationId && !currentFolderId)
+                    }
+                    data-size="sm"
+                    className="w-full min-w-0"
+                  >
+                    <Plus className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 truncate">Add</span>
+                  </DropdownMenuTrigger>
+                </span>
               </TooltipTrigger>
               {selectedDelegationId && !currentFolderId && (
                 <TooltipContent>
@@ -957,7 +755,7 @@ export function GalleryPage() {
                 }
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Upload className="h-4 w-4" />
+                <Upload />
                 Upload files
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -966,15 +764,57 @@ export function GalleryPage() {
                   setNewFolderDialogOpen(true);
                 }}
               >
-                <FolderPlus className="h-4 w-4" />
+                <FolderPlus />
                 New folder
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
           {currentFolderId && canEditNotes && (
-            <FolderNoteEditor folderId={currentFolderId} />
+            <div className="col-span-2 mt-2 lg:flex lg:min-h-0 lg:flex-1">
+              <FolderNoteEditor folderId={currentFolderId} />
+            </div>
           )}
         </aside>
+
+        {folders === undefined && (
+          <div className="flex justify-center py-12 [grid-area:content]">
+            <img
+              src="/loading.gif"
+              alt="Loading…"
+              className="w-[60%] max-w-52"
+            />
+          </div>
+        )}
+
+        <div className="mt-2 grid grid-cols-2 gap-4 [grid-area:content] sm:grid-cols-3 md:grid-cols-4 lg:mt-6 lg:grid-cols-5">
+          {folders?.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className="relative overflow-hidden rounded-xl border border-(--line) bg-(--surface) cursor-pointer hover:opacity-90 w-full aspect-square"
+              onClick={() => openFolder(f.id ?? "", f.name ?? "", f.canEdit)}
+            >
+              {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
+                <ThumbnailImage
+                  thumbnailLink={folderThumbnailLinks[f.thumbnail.fileId]!}
+                  name={f.name ?? ""}
+                  mimeType="image/"
+                  fitType="cover"
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Folder className="h-16 w-16 text-(--lagoon-deep)" />
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-2 py-1.5">
+                <span className="block h-10 w-full text-sm leading-5 font-medium text-white line-clamp-2">
+                  {f.name}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </main>
   );
