@@ -16,6 +16,8 @@ export function ThumbnailImage({
   maxWidth,
   rotateDeg = 0,
   rounded = false,
+  showBlurBackdrop = false,
+  blurBackdropSize,
 }: {
   thumbnailLink: string;
   name: string;
@@ -24,6 +26,8 @@ export function ThumbnailImage({
   maxWidth?: number;
   rotateDeg?: number;
   rounded?: boolean;
+  showBlurBackdrop?: boolean;
+  blurBackdropSize?: number;
 }) {
   const [fullStarted, setFullStarted] = useState(false);
   const [fullLoaded, setFullLoaded] = useState(false);
@@ -53,14 +57,26 @@ export function ThumbnailImage({
       : { transition: "transform 0.3s ease" };
 
   return (
-    <div className="relative size-full overflow-hidden rounded-md">
+    <div className="relative isolate size-full overflow-hidden rounded-md">
+      {showBlurBackdrop && (
+        <img
+          src={lh3Src(thumbnailLink, blurBackdropSize ?? maxWidth)}
+          alt=""
+          aria-hidden="true"
+          className={cn(
+            "absolute inset-0 z-0 size-full scale-110 object-cover opacity-50 blur-2xl",
+            rounded && "rounded-lg",
+          )}
+          referrerPolicy="no-referrer"
+        />
+      )}
       {mimeType.startsWith("video/") && (
         <div className="absolute top-1 right-1 z-10 rounded-sm bg-black/70 p-0.5">
           <Video className="size-4 text-white" />
         </div>
       )}
       {!lowLoaded && !fullLoaded && (
-        <Skeleton className="absolute inset-0 size-full" />
+        <Skeleton className="absolute inset-0 z-20 size-full" />
       )}
       {!fullLoaded && (
         <img
@@ -68,7 +84,7 @@ export function ThumbnailImage({
           alt={name}
           style={rotateStyle}
           className={cn(
-            "absolute inset-0 size-full select-none",
+            "absolute inset-0 z-10 size-full select-none",
             rounded && "rounded-lg",
             objectFitClass,
             "object-center blur-xs duration-300",
@@ -88,7 +104,7 @@ export function ThumbnailImage({
           alt={name}
           style={rotateStyle}
           className={cn(
-            "size-full select-none",
+            "absolute inset-0 z-10 size-full select-none",
             rounded && "rounded-lg",
             objectFitClass,
             "object-center",

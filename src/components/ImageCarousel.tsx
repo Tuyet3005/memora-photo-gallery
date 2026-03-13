@@ -24,6 +24,8 @@ import { useTRPC } from "#/integrations/trpc/react";
 import { cn } from "#/lib/utils";
 import { ThumbnailImage } from "./ThumbnailImage";
 
+const CAROUSEL_THUMBNAIL_SIZE = 100;
+
 function DriveVideoPlayer({ fileId }: { fileId: string }) {
   return (
     <div className="relative size-full">
@@ -268,6 +270,8 @@ export function ImageCarousel({
                     mimeType={file.mimeType ?? ""}
                     rotateDeg={optimisticRotations[file.id!] ?? 0}
                     rounded
+                    showBlurBackdrop
+                    blurBackdropSize={CAROUSEL_THUMBNAIL_SIZE}
                   />
                 ))}
               {i === currentIndex && file.id && !readOnly && (
@@ -373,7 +377,7 @@ export function ImageCarousel({
                 name={file.name ?? ""}
                 mimeType={file.mimeType ?? ""}
                 fitType="cover"
-                maxWidth={100}
+                maxWidth={CAROUSEL_THUMBNAIL_SIZE}
                 rotateDeg={optimisticRotations[file.id!] ?? 0}
               />
             </CarouselItem>
