@@ -5,6 +5,7 @@ import {
   Folder,
   FolderPlus,
   Home,
+  Link,
   Loader2,
   Plus,
   RefreshCw,
@@ -830,11 +831,16 @@ export function GalleryPage() {
         <div className="mt-2 grid grid-cols-3 gap-4 [grid-area:content] md:grid-cols-4 lg:mt-6 lg:grid-cols-5">
           {folders?.map((f) => (
             <button
-              key={f.id}
+              key={f.shortcutId ?? f.id}
               type="button"
               className="relative aspect-square w-full cursor-pointer overflow-hidden rounded-xl border border-(--line) bg-(--surface) hover:opacity-90"
               onClick={() => openFolder(f.id ?? "", f.name ?? "", f.canEdit)}
             >
+              {f.isShortcut && (
+                <div className="absolute top-1 right-1 z-10 rounded-lg bg-black/50 p-1 text-white">
+                  <Link className="size-3.5" />
+                </div>
+              )}
               {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
                 <ThumbnailImage
                   thumbnailLink={folderThumbnailLinks[f.thumbnail.fileId]!}

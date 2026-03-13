@@ -46,13 +46,33 @@ export const driveRouter = createTRPCRouter({
       const parent = input.folderId ?? "root";
 
       const res = await drive.files.list({
-        fields: "files(id,name,mimeType,capabilities(canEdit))",
+        fields:
+          "files(id,name,mimeType,capabilities(canEdit),shortcutDetails(targetId,targetMimeType))",
         orderBy: "name",
-        q: `'${parent}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`,
+        q: `'${parent}' in parents and trashed = false and (mimeType = 'application/vnd.google-apps.folder' or (mimeType = 'application/vnd.google-apps.shortcut' and shortcutDetails.targetMimeType = 'application/vnd.google-apps.folder'))`,
       });
 
       const files = res.data.files ?? [];
-      const folderIds = files.map((f) => f.id).filter(Boolean) as string[];
+      const normalizedFolders = files
+        .map((f) => {
+          const isShortcut =
+            f.mimeType === "application/vnd.google-apps.shortcut";
+          const effectiveId = isShortcut
+            ? (f.shortcutDetails?.targetId ?? null)
+            : (f.id ?? null);
+
+          if (!effectiveId) return null;
+
+          return {
+            ...f,
+            id: effectiveId,
+            shortcutId: isShortcut ? (f.id ?? null) : null,
+            isShortcut,
+          };
+        })
+        .filter((f) => f !== null);
+
+      const folderIds = normalizedFolders.map((f) => f.id);
 
       const thumbnails =
         folderIds.length > 0
@@ -66,7 +86,7 @@ export const driveRouter = createTRPCRouter({
         thumbnails.map((t) => [t.folderId, t]),
       );
 
-      return files.map((f) => ({
+      return normalizedFolders.map((f) => ({
         ...f,
         canEdit: f.capabilities?.canEdit ?? false,
         thumbnail: f.id ? (thumbnailMap[f.id] ?? null) : null,
