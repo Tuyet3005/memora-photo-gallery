@@ -207,6 +207,54 @@ export const driveRouter = createTRPCRouter({
       return { id: res.data.id!, name: res.data.name! };
     }),
 
+  renameFolder: protectedProcedure
+    .input(
+      z.object({
+        folderId: z.string(),
+        name: z.string().trim().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const drive = await getAuthedDrive(ctx.session.user.id);
+
+      const folderRes = await drive.files.get({
+        fileId: input.folderId,
+        fields: "id,name,capabilities(canEdit)",
+      });
+
+      if (!folderRes.data.id) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Folder not found",
+        });
+      }
+
+      if (!folderRes.data.capabilities?.canEdit) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have edit permission for this folder",
+        });
+      }
+
+      if (folderRes.data.name === "Memora") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Memora folder cannot be renamed",
+        });
+      }
+
+      const updated = await drive.files.update({
+        fileId: input.folderId,
+        requestBody: { name: input.name },
+        fields: "id,name",
+      });
+
+      return {
+        id: updated.data.id ?? input.folderId,
+        name: updated.data.name ?? input.name,
+      };
+    }),
+
   generateUploadUrl: protectedProcedure
     .input(
       z.object({

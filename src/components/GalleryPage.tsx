@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   CheckCircle2,
+  Edit3,
   Folder,
   FolderPlus,
   Home,
@@ -257,6 +258,9 @@ export function GalleryPage() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [renameFolderDialogOpen, setRenameFolderDialogOpen] = useState(false);
+  const [renameFolderId, setRenameFolderId] = useState("");
+  const [renameFolderName, setRenameFolderName] = useState("");
   const [selectedDelegationId, setSelectedDelegationId] = useState<
     string | null
   >(null);
@@ -301,6 +305,8 @@ export function GalleryPage() {
 
   const createFolder = useMutation(trpc.drive.createFolder.mutationOptions());
 
+  const renameFolder = useMutation(trpc.drive.renameFolder.mutationOptions());
+
   function handleCreateFolder(e: React.FormEvent) {
     e.preventDefault();
     const name = newFolderName.trim();
@@ -317,6 +323,33 @@ export function GalleryPage() {
           );
         },
         onError: () => toast.error("Failed to create folder"),
+      },
+    );
+  }
+
+  function handleStartRenameFolder(folderId: string, name: string) {
+    setRenameFolderId(folderId);
+    setRenameFolderName(name);
+    setRenameFolderDialogOpen(true);
+  }
+
+  function handleRenameFolder(e: React.FormEvent) {
+    e.preventDefault();
+    const name = renameFolderName.trim();
+    if (!renameFolderId || !name) return;
+
+    renameFolder.mutate(
+      { folderId: renameFolderId, name },
+      {
+        onSuccess: () => {
+          toast.success("Folder renamed");
+          setRenameFolderDialogOpen(false);
+          setRenameFolderId("");
+          queryClient.invalidateQueries(
+            trpc.drive.listFolders.queryOptions({ folderId: currentFolderId }),
+          );
+        },
+        onError: () => toast.error("Failed to rename folder"),
       },
     );
   }
@@ -543,6 +576,41 @@ export function GalleryPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={renameFolderDialogOpen}
+        onOpenChange={(open) => {
+          setRenameFolderDialogOpen(open);
+          if (!open) {
+            setRenameFolderId("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename folder</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleRenameFolder}>
+            <Input
+              autoFocus
+              placeholder="Folder name"
+              value={renameFolderName}
+              onChange={(e) => setRenameFolderName(e.target.value)}
+            />
+            <DialogFooter className="mt-4">
+              <Button
+                type="submit"
+                disabled={!renameFolderName.trim() || renameFolder.isPending}
+              >
+                {renameFolder.isPending && (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                )}
+                Rename
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <Breadcrumb className="w-full">
         <BreadcrumbList>
           {visibleStack.map((folder, i) => {
@@ -554,9 +622,25 @@ export function GalleryPage() {
                 {i > 0 && <BreadcrumbSeparator />}
                 <BreadcrumbItem>
                   {isLast ? (
-                    <BreadcrumbPage className="font-bold text-(--sea-ink) text-2xl leading-tight sm:text-3xl sm:leading-normal">
-                      {folder.name}
-                    </BreadcrumbPage>
+                    <div className="flex items-center gap-1.5">
+                      <BreadcrumbPage className="font-bold text-(--sea-ink) text-2xl leading-tight sm:text-3xl sm:leading-normal">
+                        {folder.name}
+                      </BreadcrumbPage>
+                      {folder.id &&
+                        folder.canEdit !== false &&
+                        folder.name !== MEMORA_ROOT_NAME && (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-(--sea-ink)/80 transition hover:bg-black/5 hover:text-(--sea-ink)"
+                            onClick={() =>
+                              handleStartRenameFolder(folder.id, folder.name)
+                            }
+                            aria-label={`Rename ${folder.name}`}
+                          >
+                            <Edit3 className="size-4" />
+                          </button>
+                        )}
+                    </div>
                   ) : (
                     <BreadcrumbLink
                       className="cursor-pointer font-bold text-2xl leading-tight sm:text-3xl sm:leading-normal"
@@ -824,9 +908,11 @@ export function GalleryPage() {
                   </div>
                 )}
                 <div className="absolute right-0 bottom-0 left-0 bg-black/40 px-2 py-1.5">
-                  <span className="line-clamp-2 block h-8 w-full font-medium text-white text-xs leading-4">
-                    {f.name}
-                  </span>
+                  <div className="flex items-start justify-between gap-1.5">
+                    <span className="line-clamp-2 block h-8 min-w-0 flex-1 font-medium text-white text-xs leading-4">
+                      {f.name}
+                    </span>
+                  </div>
                 </div>
               </button>
             ))}
