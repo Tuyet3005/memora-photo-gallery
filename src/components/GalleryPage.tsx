@@ -56,6 +56,7 @@ import {
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
+import { formatDuration, sleep } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
 import { ThumbnailImage } from "./ThumbnailImage";
 
@@ -256,6 +257,8 @@ export function GalleryPage() {
   const [uploadCount, setUploadCount] = useState(0);
   const [uploadEntries, setUploadEntries] = useState<FileUploadEntry[]>([]);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadStartedAt, setUploadStartedAt] = useState<number | null>(null);
+  const [uploadNow, setUploadNow] = useState(() => Date.now());
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [renameFolderDialogOpen, setRenameFolderDialogOpen] = useState(false);
@@ -370,6 +373,7 @@ export function GalleryPage() {
   }
 
   function openFolder(id: string, name: string, canEdit?: boolean) {
+    if (!confirmNavigationDuringUpload()) return;
     setFolderStack((prev) => [...prev, { id, name, canEdit }]);
     const isHome = id === preferences?.homeFolderId;
     navigate({
@@ -382,7 +386,67 @@ export function GalleryPage() {
   const uploading = uploadEntries.some(
     (e) => e.status === "pending" || e.status === "retrying",
   );
+  const totalUploads = uploadEntries.length;
+  const completedUploads = uploadEntries.filter(
+    (e) => e.status === "done" || e.status === "error",
+  ).length;
+  const failedUploads = uploadEntries.filter(
+    (e) => e.status === "error",
+  ).length;
+  const uploadProgressPercent =
+    totalUploads > 0 ? Math.round((completedUploads / totalUploads) * 100) : 0;
   const isDelegatedAtRoot = !!selectedDelegationId && !currentFolderId;
+  const UPLOAD_BATCH_SIZE = 5;
+  const MIN_BATCH_DURATION_MS = 1000;
+
+  const elapsedUploadSeconds = uploadStartedAt
+    ? Math.max(0.001, (uploadNow - uploadStartedAt) / 1000)
+    : 0;
+  const remainingUploads = Math.max(0, totalUploads - completedUploads);
+  const fallbackEtaSeconds =
+    totalUploads > 0
+      ? Math.ceil(
+          (remainingUploads / UPLOAD_BATCH_SIZE) *
+            (MIN_BATCH_DURATION_MS / 1000),
+        )
+      : 0;
+  const computedEtaSeconds =
+    uploadStartedAt && completedUploads > 0
+      ? Math.ceil(remainingUploads / (completedUploads / elapsedUploadSeconds))
+      : fallbackEtaSeconds;
+  const etaSeconds = uploading ? Math.max(0, computedEtaSeconds) : 0;
+
+  useEffect(() => {
+    if (!uploading || !uploadStartedAt) return;
+
+    const interval = setInterval(() => {
+      setUploadNow(Date.now());
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [uploading, uploadStartedAt]);
+
+  useEffect(() => {
+    if (!uploading) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      // Cross-browser pattern to trigger native refresh/close warning dialog.
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [uploading]);
+
+  function confirmNavigationDuringUpload() {
+    if (!uploading) return true;
+    return window.confirm(
+      "Uploads are still in progress. If you leave, unfinished uploads may fail. Continue?",
+    );
+  }
 
   async function uploadOne(file: File): Promise<void> {
     const MAX_ATTEMPTS = 3;
@@ -453,10 +517,23 @@ export function GalleryPage() {
       status: "pending",
     }));
     setUploadEntries(entries);
+    setUploadStartedAt(Date.now());
+    setUploadNow(Date.now());
     setUploadDialogOpen(true);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
-    await Promise.all(files.map(uploadOne));
+    for (let i = 0; i < files.length; i += UPLOAD_BATCH_SIZE) {
+      const batch = files.slice(i, i + UPLOAD_BATCH_SIZE);
+      const batchStartedAt = Date.now();
+
+      await Promise.all(batch.map(uploadOne));
+
+      const elapsedMs = Date.now() - batchStartedAt;
+      const hasNextBatch = i + UPLOAD_BATCH_SIZE < files.length;
+      if (hasNextBatch && elapsedMs < MIN_BATCH_DURATION_MS) {
+        await sleep(MIN_BATCH_DURATION_MS - elapsedMs);
+      }
+    }
 
     await Promise.all([
       queryClient.invalidateQueries(
@@ -468,6 +545,7 @@ export function GalleryPage() {
         }),
       }),
     ]);
+    setUploadStartedAt(null);
     setUploadCount((c) => c + 1);
   }
 
@@ -497,10 +575,18 @@ export function GalleryPage() {
         onChange={handleFileChange}
       />
 
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+      <Dialog
+        open={uploadDialogOpen}
+        onOpenChange={(open) => {
+          if (uploading && !open) return;
+          setUploadDialogOpen(open);
+        }}
+      >
         <DialogContent
-          className="max-w-sm"
+          className="max-w-md"
+          showCloseButton={!uploading}
           onInteractOutside={(e) => uploading && e.preventDefault()}
+          onEscapeKeyDown={(e) => uploading && e.preventDefault()}
         >
           <DialogHeader>
             <DialogTitle>
@@ -512,32 +598,61 @@ export function GalleryPage() {
               Please don't leave this page while uploading.
             </p>
           )}
-          <ul className="mt-1 space-y-2">
-            {uploadEntries.map((entry) => (
-              <li key={entry.name} className="flex items-start gap-2 text-sm">
-                {(entry.status === "pending" ||
-                  entry.status === "retrying") && (
-                  <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" />
-                )}
-                {entry.status === "done" && (
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-500" />
-                )}
-                {entry.status === "error" && (
-                  <XCircle className="mt-0.5 size-4 shrink-0 text-red-500" />
-                )}
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{entry.name}</p>
-                  {entry.error && (
-                    <p
-                      className={`text-xs ${entry.status === "retrying" ? "text-muted-foreground" : "text-red-500"}`}
-                    >
-                      {entry.error}
-                    </p>
+          {totalUploads > 0 && (
+            <div className="mt-1 space-y-1.5">
+              <div className="flex items-center justify-between text-muted-foreground text-xs">
+                <span>
+                  {completedUploads}/{totalUploads} files
+                  {failedUploads > 0 ? ` (${failedUploads} failed)` : ""}
+                </span>
+                <span>
+                  {uploadProgressPercent}%
+                  {uploading ? ` · ETA ${formatDuration(etaSeconds)}` : ""}
+                </span>
+              </div>
+              <div
+                className="h-2 w-full overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={uploadProgressPercent}
+                aria-label="Overall upload progress"
+              >
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-300"
+                  style={{ width: `${uploadProgressPercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <div className="mt-2 max-h-72 overflow-y-auto pr-1">
+            <ul className="space-y-2">
+              {uploadEntries.map((entry) => (
+                <li key={entry.name} className="flex items-start gap-2 text-sm">
+                  {(entry.status === "pending" ||
+                    entry.status === "retrying") && (
+                    <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" />
                   )}
-                </div>
-              </li>
-            ))}
-          </ul>
+                  {entry.status === "done" && (
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-500" />
+                  )}
+                  {entry.status === "error" && (
+                    <XCircle className="mt-0.5 size-4 shrink-0 text-red-500" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{entry.name}</p>
+                    {entry.error && (
+                      <p
+                        className={`text-xs ${entry.status === "retrying" ? "text-muted-foreground" : "text-red-500"}`}
+                      >
+                        {entry.error}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
           {!uploading && (
             <Button
               className="mt-2 w-full"
@@ -645,6 +760,7 @@ export function GalleryPage() {
                     <BreadcrumbLink
                       className="cursor-pointer font-bold text-2xl leading-tight sm:text-3xl sm:leading-normal"
                       onClick={() => {
+                        if (!confirmNavigationDuringUpload()) return;
                         const newStack = folderStack.slice(0, stackIdx + 1);
                         setFolderStack(newStack);
                         const top = newStack[newStack.length - 1];
