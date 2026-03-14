@@ -816,6 +816,7 @@ export function GalleryPage() {
                     name={f.name ?? ""}
                     mimeType="image/"
                     fitType="cover"
+                    maxWidth={200}
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">

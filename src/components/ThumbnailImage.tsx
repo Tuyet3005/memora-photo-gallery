@@ -23,7 +23,7 @@ export function ThumbnailImage({
   name: string;
   mimeType: string;
   fitType?: "contain" | "cover";
-  maxWidth?: number;
+  maxWidth: number;
   rotateDeg?: number;
   rounded?: boolean;
   showBlurBackdrop?: boolean;
