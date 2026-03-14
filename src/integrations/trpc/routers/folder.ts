@@ -8,6 +8,7 @@ import { createTRPCRouter, protectedProcedure } from "../init";
 export { NOTE_EDITOR_EMAILS };
 
 export const folderRouter = createTRPCRouter({
+  /** Returns the markdown note stored for a folder, or an empty string if none exists. */
   getNote: protectedProcedure
     .input(z.object({ folderId: z.string() }))
     .query(async ({ input }) => {
@@ -20,6 +21,8 @@ export const folderRouter = createTRPCRouter({
       return { note: row?.note ?? "" };
     }),
 
+  /** Upserts the markdown note for a folder.
+   * Only users listed in NOTE_EDITOR_EMAILS are authorised to write notes. */
   updateNote: protectedProcedure
     .input(z.object({ folderId: z.string(), note: z.string() }))
     .mutation(async ({ ctx, input }) => {

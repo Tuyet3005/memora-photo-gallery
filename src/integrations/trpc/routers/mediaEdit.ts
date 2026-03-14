@@ -34,6 +34,11 @@ async function uploadBuffer(
 }
 
 export const mediaEditRouter = createTRPCRouter({
+  /** Rotates an image in Google Drive by a multiple of 90° counter-clockwise.
+   * On the first rotation the original Drive revision is saved so that all
+   * subsequent rotations always transform the pristine original bytes — avoiding
+   * repeated re-encoding artefacts. Rotating back to 0° restores the original
+   * file content without re-encoding. */
   rotateImage: protectedProcedure
     .input(
       z.object({

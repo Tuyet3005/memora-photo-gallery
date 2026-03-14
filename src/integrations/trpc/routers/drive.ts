@@ -12,6 +12,9 @@ import { getAuthedDrive } from "#/lib/drive";
 import { createTRPCRouter, protectedProcedure } from "../init";
 
 export const driveRouter = createTRPCRouter({
+  /** Walks up the Drive hierarchy from the given folder and returns the full
+   * ancestor path as an ordered array (nearest-root first), stopping before
+   * the user's My Drive root. */
   getFolderPath: protectedProcedure
     .input(z.object({ folderId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -50,6 +53,8 @@ export const driveRouter = createTRPCRouter({
       return path;
     }),
 
+  /** Lists all child folders (and folder shortcuts) of the given parent,
+   * enriched with custom thumbnail metadata stored in the database. */
   listFolders: protectedProcedure
     .input(z.object({ folderId: z.string().optional() }))
     .query(async ({ ctx, input }) => {
@@ -104,6 +109,8 @@ export const driveRouter = createTRPCRouter({
       }));
     }),
 
+  /** Persists a custom thumbnail file ID for a folder in the database.
+   * Requires edit permission on the folder in Drive. */
   setFolderThumbnail: protectedProcedure
     .input(
       z.object({
@@ -141,6 +148,8 @@ export const driveRouter = createTRPCRouter({
         });
     }),
 
+  /** Fetches fresh Drive thumbnail links for a batch of file IDs.
+   * Returns a map of fileId → thumbnailLink; failed items are omitted. */
   getFolderThumbnails: protectedProcedure
     .input(z.object({ fileIds: z.array(z.string()) }))
     .query(async ({ ctx, input }) => {
@@ -168,6 +177,8 @@ export const driveRouter = createTRPCRouter({
       );
     }),
 
+  /** Paginates images and videos inside the given folder (or Drive root),
+   * ordered by name. Supports cursor-based pagination via page tokens. */
   listMedia: protectedProcedure
     .input(
       z.object({
@@ -195,6 +206,7 @@ export const driveRouter = createTRPCRouter({
       };
     }),
 
+  /** Creates a new Google Drive folder, optionally nested inside a parent. */
   createFolder: protectedProcedure
     .input(
       z.object({
@@ -215,6 +227,8 @@ export const driveRouter = createTRPCRouter({
       return { id: res.data.id!, name: res.data.name! };
     }),
 
+  /** Renames a Drive folder. Requires edit permission; the "Memora" root
+   * folder is protected and cannot be renamed. */
   renameFolder: protectedProcedure
     .input(
       z.object({
@@ -263,6 +277,9 @@ export const driveRouter = createTRPCRouter({
       };
     }),
 
+  /** Issues a short-lived signed upload token inserted into the database.
+   * When a delegation ID is supplied, the upload is attributed to the grantor
+   * and the target folder is shared with them so they can access the file. */
   generateUploadUrl: protectedProcedure
     .input(
       z.object({

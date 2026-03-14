@@ -6,6 +6,8 @@ import { uploadDelegation, user } from "#/db/schema";
 import { createTRPCRouter, protectedProcedure } from "../init";
 
 export const userRouter = createTRPCRouter({
+  /** Returns the current user's stored preferences: home folder ID and the
+   * active upload delegation ID (null means upload as themselves). */
   getPreferences: protectedProcedure.query(async ({ ctx }) => {
     const prefs = await db
       .select({
@@ -22,6 +24,7 @@ export const userRouter = createTRPCRouter({
     };
   }),
 
+  /** Persists the user's preferred home folder (null = Memora root). */
   setHomeFolderPreference: protectedProcedure
     .input(z.object({ folderId: z.string().nullable() }))
     .mutation(async ({ ctx, input }) => {
@@ -32,6 +35,8 @@ export const userRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  /** Looks up a registered user by email address. Used when setting up
+   * upload delegations to resolve an email to an account ID. */
   findByEmail: protectedProcedure
     .input(z.object({ email: z.string().email() }))
     .mutation(async ({ input }) => {
@@ -49,6 +54,8 @@ export const userRouter = createTRPCRouter({
       return found ?? null;
     }),
 
+  /** Grants another user (grantee) permission to upload to the current user's
+   * (grantor's) Drive folders. Idempotent — throws CONFLICT if already granted. */
   grantDelegation: protectedProcedure
     .input(z.object({ granteeEmail: z.string().email() }))
     .mutation(async ({ ctx, input }) => {
@@ -106,6 +113,8 @@ export const userRouter = createTRPCRouter({
       };
     }),
 
+  /** Returns all users who have granted upload delegation to the current user,
+   * along with the currently active delegation selection. */
   listMyGrantors: protectedProcedure.query(async ({ ctx }) => {
     const currentUser = await db
       .select({ uploadDelegationId: user.uploadDelegationId })
@@ -134,6 +143,9 @@ export const userRouter = createTRPCRouter({
     };
   }),
 
+  /** Saves which upload delegation is currently active for the user.
+   * Pass null to reset to uploading as themselves. Validates the delegation
+   * belongs to the current user before saving. */
   setUploadDelegationPreference: protectedProcedure
     .input(z.object({ delegationId: z.string().nullable() }))
     .mutation(async ({ ctx, input }) => {
@@ -163,6 +175,9 @@ export const userRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  /** Removes an upload delegation record. Either the grantor or the grantee
+   * may revoke. Automatically clears the active preference if it pointed to
+   * the revoked delegation. */
   revokeDelegation: protectedProcedure
     .input(z.object({ delegationId: z.string() }))
     .mutation(async ({ ctx, input }) => {

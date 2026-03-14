@@ -7,6 +7,8 @@ import { getAuthedDrive } from "#/lib/drive";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../init";
 
 export const shareRouter = createTRPCRouter({
+  /** Creates a public share record for a folder (idempotent — returns the
+   * existing share if one already exists) and returns its UUID share link ID. */
   createFolderShare: protectedProcedure
     .input(z.object({ folderId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -33,6 +35,8 @@ export const shareRouter = createTRPCRouter({
       return { shareId: id };
     }),
 
+  /** Looks up a share record by UUID and returns the associated folder and
+   * owner IDs, or null if the share does not exist. Public endpoint. */
   getShareInfo: publicProcedure
     .input(z.object({ shareId: z.string() }))
     .query(async ({ input }) => {
@@ -50,6 +54,8 @@ export const shareRouter = createTRPCRouter({
       return { folderId: share.folderId, userId: share.userId };
     }),
 
+  /** Paginates media inside a shared folder using the original owner's Drive
+   * credentials. No authentication required — access is granted via the share UUID. */
   listSharedMedia: publicProcedure
     .input(
       z.object({
