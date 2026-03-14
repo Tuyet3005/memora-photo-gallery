@@ -60,6 +60,12 @@ import { ThumbnailImage } from "./ThumbnailImage";
 
 type FileUploadStatus = "pending" | "retrying" | "done" | "error";
 
+interface FolderStack {
+  id: string;
+  name: string;
+  canEdit?: boolean;
+}
+
 interface FileUploadEntry {
   name: string;
   status: FileUploadStatus;
@@ -152,38 +158,70 @@ export function GalleryPage() {
   );
   const navigate = useNavigate();
   const search = useSearch({ from: "/" });
-  const isHomeRequested = search.home === true;
-  const isDriveRootRequested = search.root === true;
 
-  // folderStack always has YOUR_GALLERY as index 0
-  const [folderStack, setFolderStack] = useState<
-    { id: string; name: string; canEdit?: boolean }[]
-  >(() => {
-    if (search.home) {
-      return [YOUR_GALLERY];
-    }
-    if (search.root) {
-      return [YOUR_GALLERY];
-    }
-    if (search.folder && search.name) {
-      return [YOUR_GALLERY, { id: search.folder, name: search.name }];
-    }
-    return [YOUR_GALLERY];
+  const { data: preferences } = useQuery(
+    trpc.user.getPreferences.queryOptions(),
+  );
+  const { data: homeFolderPath } = useQuery({
+    ...trpc.drive.getFolderPath.queryOptions({
+      folderId: preferences?.homeFolderId ?? "",
+    }),
+    enabled: !!preferences?.homeFolderId,
   });
-  const [folderStackInitialized, setFolderStackInitialized] = useState(false);
+  const folderStackFromPreference = preferences?.homeFolderId
+    ? homeFolderPath
+    : undefined;
+  const folderStackFromQuery =
+    search.folder && search.name
+      ? [{ id: search.folder, name: search.name }]
+      : undefined;
 
-  const currentFolder = folderStack[folderStack.length - 1];
+  const requestedFolder = {
+    [Number(!!folderStackFromPreference)]: {
+      source: "preference" as const,
+      stack: folderStackFromPreference!,
+    },
+    [Number(search.root === true)]: {
+      source: "root" as const,
+      stack: [],
+    },
+    [Number(!!folderStackFromQuery)]: {
+      source: "query" as const,
+      stack: folderStackFromQuery!,
+    },
+  }[Number(true)];
+
+  const requestedFolderStack = requestedFolder?.stack;
+
+  const { data: folderPath } = useQuery({
+    ...trpc.drive.getFolderPath.queryOptions({
+      folderId: requestedFolderStack!.at(-1)!.id,
+    }),
+    enabled: requestedFolderStack.length > 0,
+  });
+
+  const [folderStack, setFolderStack] = useState<FolderStack[]>(
+    requestedFolderStack ?? [YOUR_GALLERY],
+  );
+
+  useEffect(() => {
+    if (folderPath) {
+      setFolderStack([YOUR_GALLERY, ...folderPath]);
+    }
+  }, [folderPath]);
+
+  const currentFolder = folderStack.at(-1);
   // Pass undefined for root (empty id = Your gallery)
-  const currentFolderId = currentFolder.id || undefined;
+  const currentFolderId = currentFolder?.id || undefined;
 
-  const { data: foldersData, isPending } = useQuery({
+  const { data: foldersData, isFoldersDataPending } = useQuery({
     ...trpc.drive.listFolders.queryOptions({ folderId: currentFolderId }),
-    enabled: folderStackInitialized,
+    enabled: !!requestedFolderStack,
     refetchOnWindowFocus: false,
   });
 
   // Only hide content when there's no cached data at all for this folder.
-  const folders = isPending ? undefined : (foldersData ?? []);
+  const folders = isFoldersDataPending ? undefined : (foldersData ?? []);
 
   // Collect fileIds of folders that have a thumbnail set, then fetch fresh links
   const thumbnailFileIds = (folders ?? [])
@@ -203,7 +241,7 @@ export function GalleryPage() {
       : undefined;
   const { data: parentFoldersData } = useQuery({
     ...trpc.drive.listFolders.queryOptions({ folderId: parentFolderId }),
-    enabled: folderStackInitialized && folderStack.length >= 2,
+    enabled: !isFoldersDataPending && folderStack.length >= 2,
     refetchOnWindowFocus: false,
   });
   const currentFolderThumbnailFileId =
@@ -224,76 +262,9 @@ export function GalleryPage() {
   >(null);
   const [delegationInitialized, setDelegationInitialized] = useState(false);
 
-  const { data: preferences } = useQuery(
-    trpc.user.getPreferences.queryOptions(),
-  );
-
   const { data: grantorData } = useQuery(
     trpc.user.listMyGrantors.queryOptions(),
   );
-
-  const { data: homeFolderPath } = useQuery({
-    ...trpc.drive.getFolderPath.queryOptions({
-      folderId: preferences?.homeFolderId ?? "",
-    }),
-    enabled: !!preferences?.homeFolderId,
-  });
-
-  const { data: urlFolderPath } = useQuery({
-    ...trpc.drive.getFolderPath.queryOptions({
-      folderId: search.folder ?? "",
-    }),
-    enabled: !!search.folder && !isDriveRootRequested,
-  });
-
-  // Initialize folderStack from home folder on first load
-  useEffect(() => {
-    if (folderStackInitialized) return;
-    if (!preferences) return;
-    if (isHomeRequested) {
-      if (preferences.homeFolderId && !homeFolderPath) return;
-      setFolderStackInitialized(true);
-      setFolderStack(
-        homeFolderPath ? [YOUR_GALLERY, ...homeFolderPath] : [YOUR_GALLERY],
-      );
-      return;
-    }
-    if (isDriveRootRequested) {
-      setFolderStackInitialized(true);
-      setFolderStack([YOUR_GALLERY]);
-      return;
-    }
-    if (preferences.homeFolderId && !homeFolderPath) return; // wait for path
-    // If URL specifies a folder, wait for its path before initializing
-    if (search.folder && !urlFolderPath) return;
-    setFolderStackInitialized(true);
-    if (search.folder && urlFolderPath) {
-      setFolderStack([YOUR_GALLERY, ...urlFolderPath]);
-    } else if (homeFolderPath) {
-      setFolderStack([YOUR_GALLERY, ...homeFolderPath]);
-    }
-  }, [
-    preferences,
-    homeFolderPath,
-    urlFolderPath,
-    folderStackInitialized,
-    isHomeRequested,
-    isDriveRootRequested,
-    search.folder,
-  ]);
-
-  useEffect(() => {
-    if (!folderStackInitialized || !isHomeRequested || !preferences) return;
-    if (preferences.homeFolderId && !homeFolderPath) return;
-    setFolderStack(
-      homeFolderPath ? [YOUR_GALLERY, ...homeFolderPath] : [YOUR_GALLERY],
-    );
-  }, [folderStackInitialized, homeFolderPath, isHomeRequested, preferences]);
-
-  useEffect(() => {
-    if (!folderStackInitialized || !isDriveRootRequested) return;
-    setFolderStack([YOUR_GALLERY]);
-  }, [folderStackInitialized, isDriveRootRequested]);
 
   // visibleStack: show from root, but skip synthetic root if the real path already starts with the same name
   const visibleStack =
@@ -370,9 +341,7 @@ export function GalleryPage() {
     const isHome = id === preferences?.homeFolderId;
     navigate({
       to: "/",
-      search: isHome
-        ? {}
-        : { home: undefined, name, folder: id, root: undefined },
+      search: isHome ? {} : { name, folder: id, root: undefined },
       replace: false,
     });
   }
@@ -600,7 +569,6 @@ export function GalleryPage() {
                           navigate({
                             to: "/",
                             search: {
-                              home: undefined,
                               name: top.name,
                               folder: top.id,
                               root: undefined,
@@ -624,7 +592,7 @@ export function GalleryPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'content''media''actions'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-8 lg:[grid-template-areas:'content_content''media_actions']">
         <div className="min-w-0 [grid-area:media]">
-          {folderStackInitialized && (
+          {!isFoldersDataPending && (
             <ImageCarousel
               folderId={currentFolderId}
               uploadCount={uploadCount}

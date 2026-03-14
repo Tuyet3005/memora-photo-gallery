@@ -22,21 +22,32 @@ export const driveRouter = createTRPCRouter({
       for (let i = 0; i < 20; i++) {
         const res = await drive.files.get({
           fileId: currentId,
-          fields: "id,name,parents,capabilities(canEdit)",
+          fields: "id,name,parents,owners(emailAddress),capabilities(canEdit)",
         });
         const file = res.data;
         if (!file.id || !file.name) break;
+
+        const parentId = file.parents?.[0];
+
+        // Exclude My Drive (no parent & owned by current user)
+        if (
+          !parentId &&
+          file.owners?.[0]?.emailAddress === ctx.session.user.email
+        ) {
+          break;
+        }
+
         path.unshift({
           id: file.id,
           name: file.name,
           canEdit: file.capabilities?.canEdit ?? false,
         });
-        const parentId = file.parents?.[0];
+
         if (!parentId) break;
         currentId = parentId;
       }
 
-      return path.slice(1); // Remove root
+      return path;
     }),
 
   listFolders: protectedProcedure
