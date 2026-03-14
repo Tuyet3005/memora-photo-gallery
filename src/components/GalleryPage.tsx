@@ -396,6 +396,8 @@ export function GalleryPage() {
   const uploadProgressPercent =
     totalUploads > 0 ? Math.round((completedUploads / totalUploads) * 100) : 0;
   const isDelegatedAtRoot = !!selectedDelegationId && !currentFolderId;
+  const isCurrentFolderHome =
+    (preferences?.homeFolderId ?? null) === (currentFolderId ?? null);
   const UPLOAD_BATCH_SIZE = 5;
   const MIN_BATCH_DURATION_MS = 1000;
 
@@ -830,6 +832,7 @@ export function GalleryPage() {
             variant="outline"
             size="sm"
             className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
+            tooltip="Reload folders and media in the current folder."
             onClick={() => {
               queryClient.resetQueries(
                 trpc.drive.listFolders.queryOptions({
@@ -853,6 +856,7 @@ export function GalleryPage() {
               className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
               disabled={createFolderShare.isPending}
               onClick={handleShare}
+              tooltip="Create and copy a share link for this folder."
             >
               {createFolderShare.isPending ? (
                 <Loader2 className="size-4 shrink-0 animate-spin" />
@@ -867,8 +871,12 @@ export function GalleryPage() {
               variant="outline"
               size="sm"
               className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
-              disabled={setHomeFolderPreference.isPending}
+              disabled={
+                setHomeFolderPreference.isPending || isCurrentFolderHome
+              }
+              tooltip="Set this folder as your default landing folder."
               onClick={() => {
+                if (isCurrentFolderHome) return;
                 setHomeFolderPreference.mutate(
                   { folderId: currentFolderId ?? null },
                   {

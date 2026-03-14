@@ -1,8 +1,14 @@
 import { cva, type VariantProps } from "class-variance-authority";
+import { CircleHelp } from "lucide-react";
 import { Slot } from "radix-ui";
 import type * as React from "react";
-
-import { cn } from "#/lib/utils";
+import { useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "#/components/ui/tooltip";
+import { cn, hasHoverSupport } from "#/lib/utils";
 
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium text-sm outline-none transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
@@ -38,15 +44,64 @@ const buttonVariants = cva(
   },
 );
 
+function ButtonHelpIcon({ content }: { content: string }) {
+  const [supportsHover] = useState(() => hasHoverSupport());
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Tooltip
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (supportsHover) {
+          setOpen(nextOpen);
+          return;
+        }
+        if (!nextOpen) setOpen(false);
+      }}
+      disableHoverableContent={!supportsHover}
+    >
+      <TooltipTrigger asChild>
+        {/* biome-ignore lint/a11y/useSemanticElements: cannot nest <button> inside <button> */}
+        <span
+          tabIndex={0}
+          role="button"
+          aria-label="Help"
+          className="ml-auto inline-flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-sm text-current/70 transition [pointer-events:all] hover:text-current"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!supportsHover) setOpen((prev) => !prev);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!supportsHover) setOpen((prev) => !prev);
+            }
+          }}
+        >
+          <CircleHelp className="size-4" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6}>
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
+  tooltip,
+  children,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    tooltip?: string;
   }) {
   const Comp = asChild ? Slot.Root : "button";
 
@@ -57,7 +112,10 @@ function Button({
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {children}
+      {tooltip && <ButtonHelpIcon content={tooltip} />}
+    </Comp>
   );
 }
 
