@@ -590,7 +590,7 @@ export function GalleryPage() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'content''media''actions'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-8 lg:[grid-template-areas:'content_content''media_actions']">
+      <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'content''media''actions'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-8 lg:[grid-template-areas:'content_actions''media_actions']">
         <div className="min-w-0 [grid-area:media]">
           {!isFoldersDataPending && (
             <ImageCarousel
