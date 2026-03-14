@@ -80,7 +80,7 @@ export function ThumbnailImage({
       )}
       {!fullLoaded && (
         <img
-          src={lh3Src(thumbnailLink, 20)}
+          src={lh3Src(thumbnailLink, 10)}
           alt={name}
           style={rotateStyle}
           className={cn(
