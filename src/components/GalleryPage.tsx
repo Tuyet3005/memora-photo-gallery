@@ -195,9 +195,9 @@ export function GalleryPage() {
 
   const { data: folderPath } = useQuery({
     ...trpc.drive.getFolderPath.queryOptions({
-      folderId: requestedFolderStack!.at(-1)!.id,
+      folderId: requestedFolderStack?.at(-1)?.id ?? "",
     }),
-    enabled: requestedFolderStack.length > 0,
+    enabled: requestedFolderStack?.length > 0,
   });
 
   const [folderStack, setFolderStack] = useState<FolderStack[]>(
@@ -625,7 +625,7 @@ export function GalleryPage() {
           )}
         </div>
 
-        <aside className="grid h-full grid-cols-2 gap-2 pb-2 [grid-area:actions] lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-2 lg:self-start">
+        <aside className="mx-auto grid h-full w-full max-w-120 grid-cols-2 gap-2 pb-2 [grid-area:actions] lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-2 lg:self-start">
           <Button
             variant="outline"
             size="sm"
