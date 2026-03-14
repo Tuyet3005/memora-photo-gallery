@@ -146,7 +146,7 @@ export const driveRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       if (input.fileIds.length === 0) return {};
       const drive = await getAuthedDrive(ctx.session.user.id);
-      const results = await Promise.all(
+      const results = await Promise.allSettled(
         input.fileIds.map(async (fileId) => {
           const res = await drive.files.get({
             fileId,
@@ -156,7 +156,15 @@ export const driveRouter = createTRPCRouter({
         }),
       );
       return Object.fromEntries(
-        results.map(({ fileId, thumbnailLink }) => [fileId, thumbnailLink]),
+        results
+          .map((result) => {
+            if (result.status === "fulfilled") {
+              return [result.value.fileId, result.value.thumbnailLink];
+            } else {
+              return null;
+            }
+          })
+          .filter(Boolean) as [string, string][],
       );
     }),
 
