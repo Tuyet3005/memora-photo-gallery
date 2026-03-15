@@ -259,7 +259,7 @@ export function GalleryPage() {
 
   // Collect fileIds of folders that have a thumbnail set, then fetch fresh links
   const thumbnailFileIds = (folders ?? [])
-    .map((f) => f.thumbnail?.fileId)
+    .map((f) => f.thumbnail?.thumbnailFileId)
     .filter(Boolean) as string[];
   const { data: folderThumbnailLinks } = useQuery({
     ...trpc.drive.getFolderThumbnails.queryOptions({
@@ -281,7 +281,7 @@ export function GalleryPage() {
   const currentFolderThumbnailFileId =
     currentFolderId && parentFoldersData
       ? (parentFoldersData.find((f) => f.id === currentFolderId)?.thumbnail
-          ?.fileId ?? null)
+          ?.thumbnailFileId ?? null)
       : null;
 
   const queryClient = useQueryClient();
@@ -1073,10 +1073,10 @@ export function GalleryPage() {
                           </div>
                         )}
                         {f.thumbnail &&
-                        folderThumbnailLinks?.[f.thumbnail.fileId] ? (
+                        folderThumbnailLinks?.[f.thumbnail.thumbnailFileId] ? (
                           <ThumbnailImage
                             thumbnailLink={
-                              folderThumbnailLinks[f.thumbnail.fileId]!
+                              folderThumbnailLinks[f.thumbnail.thumbnailFileId]!
                             }
                             name={f.name ?? ""}
                             mimeType="image/"

@@ -78,9 +78,9 @@ export const imageOriginalVersion = sqliteTable("image_original_version", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
-export const folderThumbnail = sqliteTable("folder_thumbnail", {
+export const folderMetadata = sqliteTable("folder_metadata", {
   folderId: text("folder_id").primaryKey(),
-  fileId: text("file_id").notNull(),
+  thumbnailFileId: text("thumbnail_file_id").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });

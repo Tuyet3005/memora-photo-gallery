@@ -85,6 +85,13 @@
       "when": 1772951494073,
       "tag": "0011_superb_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1773589218084,
+      "tag": "0012_fantastic_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

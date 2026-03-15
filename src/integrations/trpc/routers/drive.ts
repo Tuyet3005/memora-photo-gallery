@@ -3,7 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "#/db/index";
 import {
-  folderThumbnail,
+  folderMetadata,
   signedUpload,
   uploadDelegation,
   user,
@@ -94,8 +94,8 @@ export const driveRouter = createTRPCRouter({
         folderIds.length > 0
           ? await db
               .select()
-              .from(folderThumbnail)
-              .where(inArray(folderThumbnail.folderId, folderIds))
+              .from(folderMetadata)
+              .where(inArray(folderMetadata.folderId, folderIds))
           : [];
 
       const thumbnailMap = Object.fromEntries(
@@ -132,17 +132,17 @@ export const driveRouter = createTRPCRouter({
       }
       const now = new Date();
       await db
-        .insert(folderThumbnail)
+        .insert(folderMetadata)
         .values({
           folderId: input.folderId,
-          fileId: input.fileId,
+          thumbnailFileId: input.fileId,
           createdAt: now,
           updatedAt: now,
         })
         .onConflictDoUpdate({
-          target: folderThumbnail.folderId,
+          target: folderMetadata.folderId,
           set: {
-            fileId: input.fileId,
+            thumbnailFileId: input.fileId,
             updatedAt: now,
           },
         });
