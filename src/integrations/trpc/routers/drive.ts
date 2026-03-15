@@ -63,8 +63,8 @@ export const driveRouter = createTRPCRouter({
 
       const res = await drive.files.list({
         fields:
-          "files(id,name,mimeType,capabilities(canEdit),shortcutDetails(targetId,targetMimeType))",
-        orderBy: "name",
+          "files(id,name,mimeType,createdTime,capabilities(canEdit),shortcutDetails(targetId,targetMimeType))",
+        orderBy: "createdTime desc,name",
         q: `'${parent}' in parents and trashed = false and (mimeType = 'application/vnd.google-apps.folder' or (mimeType = 'application/vnd.google-apps.shortcut' and shortcutDetails.targetMimeType = 'application/vnd.google-apps.folder'))`,
       });
 

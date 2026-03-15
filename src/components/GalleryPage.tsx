@@ -225,6 +225,38 @@ export function GalleryPage() {
   // Only hide content when there's no cached data at all for this folder.
   const folders = isFoldersDataPending ? undefined : (foldersData ?? []);
 
+  const foldersByCreationYear = useMemo(() => {
+    if (!folders || folders.length === 0) return [];
+
+    const groups = new Map<string, typeof folders>();
+
+    for (const folder of folders) {
+      const createdAt = folder.createdTime
+        ? new Date(folder.createdTime)
+        : null;
+      const year =
+        createdAt && !Number.isNaN(createdAt.getTime())
+          ? String(createdAt.getFullYear())
+          : "Unknown";
+      const current = groups.get(year) ?? [];
+      current.push(folder);
+      groups.set(year, current);
+    }
+
+    return Array.from(groups.entries())
+      .sort(([leftYear], [rightYear]) => {
+        if (leftYear === "Unknown") return 1;
+        if (rightYear === "Unknown") return -1;
+        return Number(rightYear) - Number(leftYear);
+      })
+      .map(([year, groupedFolders]) => ({ year, folders: groupedFolders }));
+  }, [folders]);
+
+  const monthFormatter = useMemo(
+    () => new Intl.DateTimeFormat("en-US", { month: "short" }),
+    [],
+  );
+
   // Collect fileIds of folders that have a thumbnail set, then fetch fresh links
   const thumbnailFileIds = (folders ?? [])
     .map((f) => f.thumbnail?.fileId)
@@ -1004,41 +1036,70 @@ export function GalleryPage() {
           </div>
         )}
 
-        {folders && folders.length > 0 && (
-          <div className="mt-2 grid grid-cols-3 gap-4 [grid-area:content] md:grid-cols-4 lg:mt-6 lg:grid-cols-5">
-            {folders.map((f) => (
-              <button
-                key={f.shortcutId ?? f.id}
-                type="button"
-                className="relative aspect-square w-full cursor-pointer overflow-hidden rounded-xl border border-(--line) bg-(--surface) hover:opacity-90"
-                onClick={() => openFolder(f.id ?? "", f.name ?? "", f.canEdit)}
-              >
-                {f.isShortcut && (
-                  <div className="absolute top-1 right-1 z-10 rounded-lg bg-black/50 p-1 text-white">
-                    <Link className="size-3.5" />
-                  </div>
-                )}
-                {f.thumbnail && folderThumbnailLinks?.[f.thumbnail.fileId] ? (
-                  <ThumbnailImage
-                    thumbnailLink={folderThumbnailLinks[f.thumbnail.fileId]!}
-                    name={f.name ?? ""}
-                    mimeType="image/"
-                    fitType="cover"
-                    maxWidth={200}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Folder className="size-16 text-(--lagoon-deep)" />
-                  </div>
-                )}
-                <div className="absolute right-0 bottom-0 left-0 bg-black/40 px-2 py-1.5">
-                  <div className="flex items-start justify-between gap-1.5">
-                    <span className="line-clamp-2 block h-8 min-w-0 flex-1 font-medium text-white text-xs leading-4">
-                      {f.name}
-                    </span>
-                  </div>
+        {foldersByCreationYear.length > 0 && (
+          <div className="mt-2 space-y-6 [grid-area:content] lg:mt-6">
+            {foldersByCreationYear.map((group) => (
+              <section key={group.year} className="space-y-2">
+                <h2 className="font-semibold text-(--sea-ink) text-sm uppercase tracking-wide">
+                  {group.year}
+                </h2>
+                <div className="grid grid-cols-3 gap-4 md:grid-cols-4 lg:grid-cols-5">
+                  {group.folders.map((f) => {
+                    const createdAt = f.createdTime
+                      ? new Date(f.createdTime)
+                      : null;
+                    const monthLabel =
+                      createdAt && !Number.isNaN(createdAt.getTime())
+                        ? monthFormatter.format(createdAt)
+                        : null;
+
+                    return (
+                      <button
+                        key={f.shortcutId ?? f.id}
+                        type="button"
+                        className="relative aspect-square w-full cursor-pointer overflow-hidden rounded-xl border border-(--line) bg-(--surface) hover:opacity-90"
+                        onClick={() =>
+                          openFolder(f.id ?? "", f.name ?? "", f.canEdit)
+                        }
+                      >
+                        {monthLabel && (
+                          <div className="absolute top-1 left-1 z-10 rounded-full bg-black/65 px-2 py-0.5 font-medium text-[10px] text-white">
+                            {monthLabel}
+                          </div>
+                        )}
+                        {f.isShortcut && (
+                          <div className="absolute top-1 right-1 z-10 rounded-lg bg-black/50 p-1 text-white">
+                            <Link className="size-3.5" />
+                          </div>
+                        )}
+                        {f.thumbnail &&
+                        folderThumbnailLinks?.[f.thumbnail.fileId] ? (
+                          <ThumbnailImage
+                            thumbnailLink={
+                              folderThumbnailLinks[f.thumbnail.fileId]!
+                            }
+                            name={f.name ?? ""}
+                            mimeType="image/"
+                            fitType="cover"
+                            maxWidth={200}
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Folder className="size-16 text-(--lagoon-deep)" />
+                          </div>
+                        )}
+                        <div className="absolute right-0 bottom-0 left-0 bg-black/40 px-2 py-1.5">
+                          <div className="flex items-start justify-between gap-1.5">
+                            <span className="line-clamp-2 block h-8 min-w-0 flex-1 font-medium text-white text-xs leading-4">
+                              {f.name}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              </button>
+              </section>
             ))}
           </div>
         )}
