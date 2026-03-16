@@ -191,27 +191,44 @@ export const driveRouter = createTRPCRouter({
       }
 
       const drive = await getAuthedDrive(ctx.session.user.id);
-      const createdTimes = await Promise.all(
+      const scanResults = await Promise.all(
         uniqueFolderIds.map(async (folderId) => {
           try {
-            const creationTime = await fetchFolderCreationTimeValue(
-              drive,
+            const result = await fetchFolderCreationTimeValue(drive, folderId);
+            return {
               folderId,
-            );
-            return { folderId, creationTime };
+              creationTime: result.creation_time,
+              fetchedFolders: result.fetchedFolders,
+            };
           } catch (_e) {
-            return { folderId, creationTime: null as Date | null };
+            return {
+              folderId,
+              creationTime: null as Date | null,
+              fetchedFolders: {} as Record<string, Date>,
+            };
           }
         }),
       );
 
-      if (createdTimes.length > 0) {
+      const aggregatedFetchedFolders = Object.assign(
+        {},
+        ...scanResults.map((result) => result.fetchedFolders),
+      ) as Record<string, Date>;
+
+      const fetchedRows = Object.entries(aggregatedFetchedFolders)
+        .filter(([, creationTime]) => creationTime !== null)
+        .map(([folderId, creationTime]) => ({
+          folderId,
+          creationTime,
+        }));
+
+      if (fetchedRows.length > 0) {
         const now = new Date();
         await db.transaction(async (tx) => {
           await tx
             .insert(folderMetadata)
             .values(
-              createdTimes.map((row) => ({
+              fetchedRows.map((row) => ({
                 folderId: row.folderId,
                 thumbnailFileId: null,
                 creationTime: row.creationTime,
@@ -222,7 +239,7 @@ export const driveRouter = createTRPCRouter({
             .onConflictDoNothing({ target: folderMetadata.folderId });
 
           await Promise.all(
-            createdTimes.map((row) =>
+            fetchedRows.map((row) =>
               tx
                 .update(folderMetadata)
                 .set({ creationTime: row.creationTime, updatedAt: now })
@@ -233,7 +250,7 @@ export const driveRouter = createTRPCRouter({
       }
 
       return Object.fromEntries(
-        createdTimes.map((row) => [row.folderId, row.creationTime]),
+        scanResults.map((row) => [row.folderId, row.creationTime]),
       ) as Record<string, Date | null>;
     }),
 

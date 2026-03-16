@@ -5,6 +5,11 @@ import { db } from "#/db/index";
 import { account } from "#/db/schema";
 import { parseDateTimeFromName, throttle } from "#/lib/utils";
 
+export type FetchFolderCreationTimeResult = {
+  creation_time: Date | null;
+  fetchedFolders: Record<string, Date>;
+};
+
 export async function getAuthedDrive(userId: string) {
   const googleAccount = await db
     .select()
@@ -49,14 +54,16 @@ export async function getAuthedDrive(userId: string) {
 
 /** Scans a folder's media files to find the earliest creation time from EXIF or filename.
  * If no time is found, recursively searches subfolders in parallel.
- * Returns null if no valid creation time is found. Respects the maxDurationMs timeout. */
+ * Returns creation_time and a fetchedFolders map (including the requested folder).
+ * Respects the maxDurationMs timeout. */
 export async function fetchFolderCreationTimeValue(
   drive: ReturnType<typeof google.drive>,
   folderId: string,
   maxDurationMs: number = 5000,
-): Promise<Date | null> {
+): Promise<FetchFolderCreationTimeResult> {
   const startTime = Date.now();
   const MAX_DURATION_MS = maxDurationMs;
+  const fetchedFolders: Record<string, Date> = {};
 
   // Throttled wrapper for drive.files.list (100 calls per second)
   const throttledList = throttle(
@@ -120,6 +127,7 @@ export async function fetchFolderCreationTimeValue(
 
     // If we found a time in this folder, return it
     if (earliestTakenTime) {
+      fetchedFolders[currentFolderId] = earliestTakenTime;
       return earliestTakenTime;
     }
 
@@ -164,6 +172,7 @@ export async function fetchFolderCreationTimeValue(
     } while (folderPageToken);
 
     if (earliestTakenTime) {
+      fetchedFolders[currentFolderId] = earliestTakenTime;
       return earliestTakenTime;
     }
 
@@ -190,8 +199,10 @@ export async function fetchFolderCreationTimeValue(
       return null;
     }
 
+    fetchedFolders[currentFolderId] = parsedFallback;
     return parsedFallback;
   }
 
-  return searchFolder(folderId);
+  const creation_time = await searchFolder(folderId);
+  return { creation_time, fetchedFolders };
 }
