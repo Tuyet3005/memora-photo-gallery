@@ -82,7 +82,7 @@ export const shareRouter = createTRPCRouter({
         pageSize: input.pageSize,
         pageToken: input.cursor,
         fields:
-          "nextPageToken,files(id,name,mimeType,thumbnailLink,createdTime,modifiedTime)",
+          "nextPageToken,files(id,name,mimeType,thumbnailLink,createdTime,modifiedTime,imageMediaMetadata(time))",
         orderBy: "name",
         q: `'${share.folderId}' in parents and trashed = false and (mimeType contains 'image/' or mimeType contains 'video/')`,
       });

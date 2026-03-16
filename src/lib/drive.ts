@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { type drive_v3, google } from "googleapis";
 import { db } from "#/db/index";
 import { account } from "#/db/schema";
-import { parseDateTimeFromName, throttle } from "#/lib/utils";
+import { resolveMediaDateTime, throttle } from "#/lib/utils";
 
 export type FetchFolderCreationTimeResult = {
   creation_time: Date | null;
@@ -88,7 +88,8 @@ export async function fetchFolderCreationTimeValue(
       }
 
       const res = await throttledList({
-        fields: "nextPageToken,files(name,imageMediaMetadata(time))",
+        fields:
+          "nextPageToken,files(name,createdTime,modifiedTime,imageMediaMetadata(time))",
         pageSize: 1000,
         pageToken,
         q: `'${currentFolderId}' in parents and trashed = false and (mimeType contains 'image/' or mimeType contains 'video/')`,
@@ -97,21 +98,12 @@ export async function fetchFolderCreationTimeValue(
       const files = res.data.files ?? [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        let candidateTime: Date | null = null;
-
-        // Try EXIF time first
-        const timeRaw = file.imageMediaMetadata?.time;
-        if (timeRaw) {
-          const parsed = new Date(timeRaw);
-          if (!Number.isNaN(parsed.getTime())) {
-            candidateTime = parsed;
-          }
-        }
-
-        // If no EXIF time, try parsing filename
-        if (!candidateTime && file.name) {
-          candidateTime = parseDateTimeFromName(file.name);
-        }
+        const candidateTime = resolveMediaDateTime({
+          metadataTime: file.imageMediaMetadata?.time,
+          fileName: file.name,
+          createdTime: file.createdTime,
+          modifiedTime: file.modifiedTime,
+        });
 
         // Update earliest time if this candidate is earlier
         if (

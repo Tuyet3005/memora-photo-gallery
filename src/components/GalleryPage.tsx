@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Edit3,
   Folder,
   FolderPlus,
@@ -10,7 +12,9 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  RotateCw,
   Share2,
+  Sparkles,
   Upload,
   XCircle,
 } from "lucide-react";
@@ -58,6 +62,7 @@ import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
 import { formatDuration, groupBy, sleep } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
+import { SetFolderCreationDateDialog } from "./SetFolderCreationDateDialog";
 import { ThumbnailImage } from "./ThumbnailImage";
 
 type FileUploadStatus = "pending" | "retrying" | "done" | "error";
@@ -229,6 +234,16 @@ export function GalleryPage() {
   const [fetchedCreationTimes, setFetchedCreationTimes] = useState<
     Record<string, Date | null>
   >({});
+  const [inFlightCreationTimeFolderIds, setInFlightCreationTimeFolderIds] =
+    useState<Set<string>>(new Set());
+  const [isRefreshingFolderDates, setIsRefreshingFolderDates] =
+    useState<boolean>(false);
+  const [setCreationDateDialogOpen, setSetCreationDateDialogOpen] =
+    useState<boolean>(false);
+  const [selectedFolderForDateEdit, setSelectedFolderForDateEdit] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Only hide content when there's no cached data at all for this folder.
   const folders = isFoldersDataPending ? undefined : (foldersData ?? []);
@@ -245,11 +260,25 @@ export function GalleryPage() {
   );
 
   useEffect(() => {
-    if (pendingCreationTimeFolderIds.length === 0) return;
+    if (pendingCreationTimeFolderIds.length === 0) {
+      if (isRefreshingFolderDates && inFlightCreationTimeFolderIds.size === 0) {
+        toast.success("Folder dates updated");
+        setIsRefreshingFolderDates(false);
+      }
+      return;
+    }
     if (fetchFolderCreationTime.isPending) return;
 
     const batchFolderIds = pendingCreationTimeFolderIds.slice(0, 20);
     if (batchFolderIds.length === 0) return;
+
+    setInFlightCreationTimeFolderIds((prev) => {
+      const next = new Set(prev);
+      for (let i = 0; i < batchFolderIds.length; i++) {
+        next.add(batchFolderIds[i]);
+      }
+      return next;
+    });
 
     fetchFolderCreationTime
       .mutateAsync({ folderIds: batchFolderIds })
@@ -266,8 +295,22 @@ export function GalleryPage() {
           ...prev,
           ...Object.fromEntries(batchFolderIds.map((id) => [id, null])),
         }));
+      })
+      .finally(() => {
+        setInFlightCreationTimeFolderIds((prev) => {
+          const next = new Set(prev);
+          for (let i = 0; i < batchFolderIds.length; i++) {
+            next.delete(batchFolderIds[i]);
+          }
+          return next;
+        });
       });
-  }, [pendingCreationTimeFolderIds, fetchFolderCreationTime]);
+  }, [
+    pendingCreationTimeFolderIds,
+    fetchFolderCreationTime,
+    inFlightCreationTimeFolderIds,
+    isRefreshingFolderDates,
+  ]);
 
   const foldersWithFetchedCreationTime = useMemo(() => {
     if (!folders) return undefined;
@@ -304,9 +347,22 @@ export function GalleryPage() {
       ),
     )
       .sort(([leftYear], [rightYear]) => Number(rightYear) - Number(leftYear))
-      .map(([year, groupedFolders]) => ({ year, folders: groupedFolders }));
+      .map(([year, groupedFolders]) => ({
+        year,
+        folders: groupedFolders.sort(
+          (a, b) =>
+            (b.resolvedCreationTime?.getTime() ?? 0) -
+            (a.resolvedCreationTime?.getTime() ?? 0),
+        ),
+      }));
 
-    return { foldersByCreationYear: byYear, ungroupedFolders: ungrouped };
+    const sortedUngrouped = ungrouped.sort(
+      (a, b) =>
+        (b.metadata?.creationTime?.getTime() ?? 0) -
+        (a.metadata?.creationTime?.getTime() ?? 0),
+    );
+
+    return { foldersByCreationYear: byYear, ungroupedFolders: sortedUngrouped };
   }, [folderList]);
 
   const folderSections = useMemo(() => {
@@ -334,7 +390,12 @@ export function GalleryPage() {
   }, [foldersByCreationYear, ungroupedFolders]);
 
   const monthFormatter = useMemo(
-    () => new Intl.DateTimeFormat("en-US", { month: "short" }),
+    () => ({
+      format: (date: Date) => {
+        const month = date.getMonth() + 1;
+        return String(month).padStart(2, "0");
+      },
+    }),
     [],
   );
 
@@ -374,6 +435,9 @@ export function GalleryPage() {
   const [uploadNow, setUploadNow] = useState(() => Date.now());
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [collapsedYearKeys, setCollapsedYearKeys] = useState<Set<string>>(
+    new Set(),
+  );
   const [renameFolderDialogOpen, setRenameFolderDialogOpen] = useState(false);
   const [renameFolderId, setRenameFolderId] = useState("");
   const [renameFolderName, setRenameFolderName] = useState("");
@@ -509,6 +573,7 @@ export function GalleryPage() {
   const uploadProgressPercent =
     totalUploads > 0 ? Math.round((completedUploads / totalUploads) * 100) : 0;
   const isDelegatedAtRoot = !!selectedDelegationId && !currentFolderId;
+  const isMemoraFolder = currentFolder?.name === MEMORA_ROOT_NAME;
   const isCurrentFolderHome =
     (preferences?.homeFolderId ?? null) === (currentFolderId ?? null);
   const UPLOAD_BATCH_SIZE = 5;
@@ -680,512 +745,665 @@ export function GalleryPage() {
   );
 
   return (
-    <main className="mx-auto max-w-6xl px-8 py-4 sm:px-10">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,video/*"
-        multiple
-        className="hidden"
-        onChange={handleFileChange}
-      />
+    <>
+      <main className="mx-auto max-w-6xl px-8 py-4 sm:px-10">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+        />
 
-      <Dialog
-        open={uploadDialogOpen}
-        onOpenChange={(open) => {
-          if (uploading && !open) return;
-          setUploadDialogOpen(open);
-        }}
-      >
-        <DialogContent
-          className="max-w-md"
-          showCloseButton={!uploading}
-          onInteractOutside={(e) => uploading && e.preventDefault()}
-          onEscapeKeyDown={(e) => uploading && e.preventDefault()}
+        <Dialog
+          open={uploadDialogOpen}
+          onOpenChange={(open) => {
+            if (uploading && !open) return;
+            setUploadDialogOpen(open);
+          }}
         >
-          <DialogHeader>
-            <DialogTitle>
-              {uploading ? "Uploading…" : "Upload complete"}
-            </DialogTitle>
-          </DialogHeader>
-          {uploading && (
-            <p className="text-muted-foreground text-sm sm:hidden">
-              Please don't leave this page while uploading.
-            </p>
-          )}
-          {totalUploads > 0 && (
-            <div className="mt-1 space-y-1.5">
-              <div className="flex items-center justify-between text-muted-foreground text-xs">
-                <span>
-                  {completedUploads}/{totalUploads} files
-                  {failedUploads > 0 ? ` (${failedUploads} failed)` : ""}
-                </span>
-                <span>
-                  {uploadProgressPercent}%
-                  {uploading ? ` · ETA ${formatDuration(etaSeconds)}` : ""}
-                </span>
-              </div>
-              <div
-                className="h-2 w-full overflow-hidden rounded-full bg-muted"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={uploadProgressPercent}
-                aria-label="Overall upload progress"
-              >
+          <DialogContent
+            className="max-w-md"
+            showCloseButton={!uploading}
+            onInteractOutside={(e) => uploading && e.preventDefault()}
+            onEscapeKeyDown={(e) => uploading && e.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {uploading ? "Uploading…" : "Upload complete"}
+              </DialogTitle>
+            </DialogHeader>
+            {uploading && (
+              <p className="text-muted-foreground text-sm sm:hidden">
+                Please don't leave this page while uploading.
+              </p>
+            )}
+            {totalUploads > 0 && (
+              <div className="mt-1 space-y-1.5">
+                <div className="flex items-center justify-between text-muted-foreground text-xs">
+                  <span>
+                    {completedUploads}/{totalUploads} files
+                    {failedUploads > 0 ? ` (${failedUploads} failed)` : ""}
+                  </span>
+                  <span>
+                    {uploadProgressPercent}%
+                    {uploading ? ` · ETA ${formatDuration(etaSeconds)}` : ""}
+                  </span>
+                </div>
                 <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-300"
-                  style={{ width: `${uploadProgressPercent}%` }}
-                />
+                  className="h-2 w-full overflow-hidden rounded-full bg-muted"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={uploadProgressPercent}
+                  aria-label="Overall upload progress"
+                >
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width] duration-300"
+                    style={{ width: `${uploadProgressPercent}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-          <div className="mt-2 max-h-72 overflow-y-auto pr-1">
-            <ul className="space-y-2">
-              {uploadEntries.map((entry) => (
-                <li key={entry.name} className="flex items-start gap-2 text-sm">
-                  {(entry.status === "pending" ||
-                    entry.status === "retrying") && (
-                    <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" />
-                  )}
-                  {entry.status === "done" && (
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-500" />
-                  )}
-                  {entry.status === "error" && (
-                    <XCircle className="mt-0.5 size-4 shrink-0 text-red-500" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{entry.name}</p>
-                    {entry.error && (
-                      <p
-                        className={`text-xs ${entry.status === "retrying" ? "text-muted-foreground" : "text-red-500"}`}
-                      >
-                        {entry.error}
-                      </p>
+            )}
+            <div className="mt-2 max-h-72 overflow-y-auto pr-1">
+              <ul className="space-y-2">
+                {uploadEntries.map((entry) => (
+                  <li
+                    key={entry.name}
+                    className="flex items-start gap-2 text-sm"
+                  >
+                    {(entry.status === "pending" ||
+                      entry.status === "retrying") && (
+                      <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" />
                     )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-          {!uploading && (
-            <Button
-              className="mt-2 w-full"
-              onClick={() => setUploadDialogOpen(false)}
-            >
-              Done
-            </Button>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={newFolderDialogOpen} onOpenChange={setNewFolderDialogOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>New folder</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreateFolder}>
-            <Input
-              autoFocus
-              placeholder="Folder name"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-            />
-            <DialogFooter className="mt-4">
-              <Button
-                type="submit"
-                disabled={!newFolderName.trim() || createFolder.isPending}
-              >
-                {createFolder.isPending && (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                )}
-                Create
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={renameFolderDialogOpen}
-        onOpenChange={(open) => {
-          setRenameFolderDialogOpen(open);
-          if (!open) {
-            setRenameFolderId("");
-          }
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Rename folder</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleRenameFolder}>
-            <Input
-              autoFocus
-              placeholder="Folder name"
-              value={renameFolderName}
-              onChange={(e) => setRenameFolderName(e.target.value)}
-            />
-            <DialogFooter className="mt-4">
-              <Button
-                type="submit"
-                disabled={!renameFolderName.trim() || renameFolder.isPending}
-              >
-                {renameFolder.isPending && (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                )}
-                Rename
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Breadcrumb className="w-full">
-        <BreadcrumbList>
-          {visibleStack.map((folder, i) => {
-            const isLast = i === visibleStack.length - 1;
-            // Find the real index in folderStack to slice correctly on navigate
-            const stackIdx = folderStack.indexOf(folder);
-            return (
-              <Fragment key={stackIdx}>
-                {i > 0 && <BreadcrumbSeparator />}
-                <BreadcrumbItem>
-                  {isLast ? (
-                    <div className="flex items-center gap-1.5">
-                      <BreadcrumbPage className="font-bold text-(--sea-ink) text-2xl leading-tight sm:text-3xl sm:leading-normal">
-                        {folder.name}
-                      </BreadcrumbPage>
-                      {folder.id &&
-                        folder.canEdit !== false &&
-                        folder.name !== MEMORA_ROOT_NAME && (
-                          <button
-                            type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-(--sea-ink)/80 transition hover:bg-black/5 hover:text-(--sea-ink)"
-                            onClick={() =>
-                              handleStartRenameFolder(folder.id, folder.name)
-                            }
-                            aria-label={`Rename ${folder.name}`}
-                          >
-                            <Edit3 className="size-4" />
-                          </button>
-                        )}
+                    {entry.status === "done" && (
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-500" />
+                    )}
+                    {entry.status === "error" && (
+                      <XCircle className="mt-0.5 size-4 shrink-0 text-red-500" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{entry.name}</p>
+                      {entry.error && (
+                        <p
+                          className={`text-xs ${entry.status === "retrying" ? "text-muted-foreground" : "text-red-500"}`}
+                        >
+                          {entry.error}
+                        </p>
+                      )}
                     </div>
-                  ) : (
-                    <BreadcrumbLink
-                      className="cursor-pointer font-bold text-2xl leading-tight sm:text-3xl sm:leading-normal"
-                      onClick={() => {
-                        if (!confirmNavigationDuringUpload()) return;
-                        const newStack = folderStack.slice(0, stackIdx + 1);
-                        setFolderStack(newStack);
-                        const top = newStack[newStack.length - 1];
-                        const topIsHome = top.id === preferences?.homeFolderId;
-                        if (top.id && !topIsHome) {
-                          navigate({
-                            to: "/",
-                            search: {
-                              name: top.name,
-                              folder: top.id,
-                              root: undefined,
-                            },
-                            replace: false,
-                          });
-                        } else {
-                          navigate({ to: "/", search: {}, replace: false });
-                        }
-                      }}
-                    >
-                      {folder.name}
-                    </BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>
-              </Fragment>
-            );
-          })}
-        </BreadcrumbList>
-      </Breadcrumb>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {!uploading && (
+              <Button
+                className="mt-2 w-full"
+                onClick={() => setUploadDialogOpen(false)}
+              >
+                Done
+              </Button>
+            )}
+          </DialogContent>
+        </Dialog>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'content''media''actions'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-8 lg:[grid-template-areas:'content_actions''media_actions']">
-        <div className="min-w-0 [grid-area:media]">
-          {!isFoldersDataPending && (
-            <ImageCarousel
-              folderId={currentFolderId}
-              uploadCount={uploadCount}
-              currentThumbnailFileId={currentFolderThumbnailFileId}
-              ancestorFolders={ancestorFolders}
-              onThumbnailSet={(fileId, targetFolderId) => {
-                return new Promise<void>((resolve, reject) => {
-                  const targetParentId =
-                    folderStack[
-                      folderStack.findIndex((f) => f.id === targetFolderId) - 1
-                    ]?.id || undefined;
-                  setFolderThumbnailMutation.mutate(
-                    { folderId: targetFolderId, fileId },
-                    {
-                      onSuccess: () => {
-                        toast.success("Folder thumbnail updated");
-                        queryClient.invalidateQueries(
-                          trpc.drive.listFolders.queryOptions({
-                            folderId: targetParentId,
-                          }),
-                        );
-                        resolve();
+        <Dialog
+          open={newFolderDialogOpen}
+          onOpenChange={setNewFolderDialogOpen}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>New folder</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCreateFolder}>
+              <Input
+                autoFocus
+                placeholder="Folder name"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+              />
+              <DialogFooter className="mt-4">
+                <Button
+                  type="submit"
+                  disabled={!newFolderName.trim() || createFolder.isPending}
+                >
+                  {createFolder.isPending && (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  )}
+                  Create
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={renameFolderDialogOpen}
+          onOpenChange={(open) => {
+            setRenameFolderDialogOpen(open);
+            if (!open) {
+              setRenameFolderId("");
+            }
+          }}
+        >
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Rename folder</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleRenameFolder}>
+              <Input
+                autoFocus
+                placeholder="Folder name"
+                value={renameFolderName}
+                onChange={(e) => setRenameFolderName(e.target.value)}
+              />
+              <DialogFooter className="mt-4">
+                <Button
+                  type="submit"
+                  disabled={!renameFolderName.trim() || renameFolder.isPending}
+                >
+                  {renameFolder.isPending && (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  )}
+                  Rename
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <Breadcrumb className="w-full">
+          <BreadcrumbList>
+            {visibleStack.map((folder, i) => {
+              const isLast = i === visibleStack.length - 1;
+              // Find the real index in folderStack to slice correctly on navigate
+              const stackIdx = folderStack.indexOf(folder);
+              return (
+                <Fragment key={stackIdx}>
+                  {i > 0 && <BreadcrumbSeparator />}
+                  <BreadcrumbItem>
+                    {isLast ? (
+                      <div className="flex items-center gap-1.5">
+                        <BreadcrumbPage className="font-bold text-(--sea-ink) text-2xl leading-tight sm:text-3xl sm:leading-normal">
+                          {folder.name}
+                        </BreadcrumbPage>
+                        {folder.id &&
+                          folder.canEdit !== false &&
+                          folder.name !== MEMORA_ROOT_NAME && (
+                            <button
+                              type="button"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-(--sea-ink)/80 transition hover:bg-black/5 hover:text-(--sea-ink)"
+                              onClick={() =>
+                                handleStartRenameFolder(folder.id, folder.name)
+                              }
+                              aria-label={`Rename ${folder.name}`}
+                            >
+                              <Edit3 className="size-4" />
+                            </button>
+                          )}
+                      </div>
+                    ) : (
+                      <BreadcrumbLink
+                        className="cursor-pointer font-bold text-2xl leading-tight sm:text-3xl sm:leading-normal"
+                        onClick={() => {
+                          if (!confirmNavigationDuringUpload()) return;
+                          const newStack = folderStack.slice(0, stackIdx + 1);
+                          setFolderStack(newStack);
+                          const top = newStack[newStack.length - 1];
+                          const topIsHome =
+                            top.id === preferences?.homeFolderId;
+                          if (top.id && !topIsHome) {
+                            navigate({
+                              to: "/",
+                              search: {
+                                name: top.name,
+                                folder: top.id,
+                                root: undefined,
+                              },
+                              replace: false,
+                            });
+                          } else {
+                            navigate({ to: "/", search: {}, replace: false });
+                          }
+                        }}
+                      >
+                        {folder.name}
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </Fragment>
+              );
+            })}
+          </BreadcrumbList>
+        </Breadcrumb>
+
+        <div className="mt-6 grid grid-cols-1 gap-4 [grid-template-areas:'content''media''actions'] lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-x-8 lg:[grid-template-areas:'content_actions''media_actions']">
+          <div className="min-w-0 [grid-area:media]">
+            {!isFoldersDataPending && (
+              <ImageCarousel
+                folderId={currentFolderId}
+                uploadCount={uploadCount}
+                currentThumbnailFileId={currentFolderThumbnailFileId}
+                ancestorFolders={ancestorFolders}
+                onThumbnailSet={(fileId, targetFolderId) => {
+                  return new Promise<void>((resolve, reject) => {
+                    const targetParentId =
+                      folderStack[
+                        folderStack.findIndex((f) => f.id === targetFolderId) -
+                          1
+                      ]?.id || undefined;
+                    setFolderThumbnailMutation.mutate(
+                      { folderId: targetFolderId, fileId },
+                      {
+                        onSuccess: () => {
+                          toast.success("Folder thumbnail updated");
+                          queryClient.invalidateQueries(
+                            trpc.drive.listFolders.queryOptions({
+                              folderId: targetParentId,
+                            }),
+                          );
+                          resolve();
+                        },
+                        onError: () => reject(),
                       },
-                      onError: () => reject(),
-                    },
-                  );
+                    );
+                  });
+                }}
+              />
+            )}
+          </div>
+
+          <aside className="mx-auto grid h-full w-full max-w-120 grid-cols-2 gap-2 pb-2 [grid-area:actions] lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-2 lg:self-start">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
+              tooltip="Reload folders and media in the current folder."
+              onClick={() => {
+                queryClient.resetQueries(
+                  trpc.drive.listFolders.queryOptions({
+                    folderId: currentFolderId,
+                  }),
+                );
+                queryClient.resetQueries({
+                  queryKey: trpc.drive.listMedia.infiniteQueryKey({
+                    folderId: currentFolderId,
+                  }),
                 });
               }}
-            />
-          )}
-        </div>
-
-        <aside className="mx-auto grid h-full w-full max-w-120 grid-cols-2 gap-2 pb-2 [grid-area:actions] lg:sticky lg:top-20 lg:flex lg:flex-col lg:gap-2 lg:self-start">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
-            tooltip="Reload folders and media in the current folder."
-            onClick={() => {
-              queryClient.resetQueries(
-                trpc.drive.listFolders.queryOptions({
-                  folderId: currentFolderId,
-                }),
-              );
-              queryClient.resetQueries({
-                queryKey: trpc.drive.listMedia.infiniteQueryKey({
-                  folderId: currentFolderId,
-                }),
-              });
-            }}
-          >
-            <RefreshCw className="size-4 shrink-0" />
-            <span className="min-w-0 truncate">Refresh</span>
-          </Button>
-          {currentFolderId && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
-              disabled={createFolderShare.isPending}
-              onClick={handleShare}
-              tooltip="Create and copy a share link for this folder."
             >
-              {createFolderShare.isPending ? (
-                <Loader2 className="size-4 shrink-0 animate-spin" />
-              ) : (
-                <Share2 className="size-4 shrink-0" />
-              )}
-              <span className="min-w-0 truncate">Share</span>
+              <RefreshCw className="size-4 shrink-0" />
+              <span className="min-w-0 truncate">Refresh</span>
             </Button>
-          )}
-          {preferences !== undefined && (
             <Button
               variant="outline"
               size="sm"
               className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
-              disabled={
-                setHomeFolderPreference.isPending || isCurrentFolderHome
-              }
-              tooltip="Set this folder as your default landing folder."
+              disabled={isRefreshingFolderDates}
+              tooltip="Re-fetch creation dates for all folders in this folder."
               onClick={() => {
-                if (isCurrentFolderHome) return;
-                setHomeFolderPreference.mutate(
-                  { folderId: currentFolderId ?? null },
-                  {
-                    onSuccess: () => {
-                      queryClient.invalidateQueries(
-                        trpc.user.getPreferences.queryOptions(),
-                      );
-                      toast.success("Home folder updated");
-                    },
-                  },
-                );
+                const allFolderIds = (folders ?? [])
+                  .filter((f) => f.id)
+                  .map((f) => f.id!);
+                if (allFolderIds.length === 0) return;
+
+                setIsRefreshingFolderDates(true);
+                setFetchedCreationTimes({});
+
+                // Batch into groups of 20
+                const batches: string[][] = [];
+                for (let i = 0; i < allFolderIds.length; i += 20) {
+                  batches.push(allFolderIds.slice(i, i + 20));
+                }
+
+                Promise.all(
+                  batches.map((batch) =>
+                    fetchFolderCreationTime
+                      .mutateAsync({ folderIds: batch })
+                      .then((result) => {
+                        setFetchedCreationTimes((prev) => ({
+                          ...prev,
+                          ...result,
+                        }));
+                      })
+                      .catch(() => {
+                        // Mark failed IDs as null
+                        const errorResult = Object.fromEntries(
+                          batch.map((id) => [id, null]),
+                        );
+                        setFetchedCreationTimes((prev) => ({
+                          ...prev,
+                          ...errorResult,
+                        }));
+                      }),
+                  ),
+                ).finally(() => {
+                  setIsRefreshingFolderDates(false);
+                  toast.success("Folder dates updated");
+                });
               }}
             >
-              {setHomeFolderPreference.isPending ? (
+              {isRefreshingFolderDates ? (
                 <Loader2 className="size-4 shrink-0 animate-spin" />
               ) : (
-                <Home className="size-4 shrink-0" />
+                <RotateCw className="size-4 shrink-0" />
               )}
-              <span className="min-w-0 truncate">Set home folder</span>
+              <span className="min-w-0 truncate">Refresh folder dates</span>
             </Button>
-          )}
-          {grantorData && grantorData.grantors.length > 0 && (
-            <Select
-              value={selectedDelegationId ?? "me"}
-              onValueChange={(val) => {
-                const newId = val === "me" ? null : val;
-                setSelectedDelegationId(newId);
-                setPreference.mutate({ delegationId: newId });
-              }}
-            >
-              <SelectTrigger size="sm" className="w-full min-w-0 justify-start">
-                {selectedDelegationId === null ? (
-                  <AccountOption
-                    image={session?.user.image}
-                    name={session?.user.name ?? "Me"}
-                  />
+            {currentFolderId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
+                disabled={isMemoraFolder}
+                tooltip={
+                  isMemoraFolder
+                    ? "Setting date is not allowed for the Memora folder."
+                    : "Set the creation date for this folder."
+                }
+                onClick={() => {
+                  if (isMemoraFolder) return;
+                  setSelectedFolderForDateEdit({
+                    id: currentFolderId,
+                    name: currentFolder?.name || "Folder",
+                  });
+                  setSetCreationDateDialogOpen(true);
+                }}
+              >
+                <Edit3 className="size-4 shrink-0" />
+                <span className="min-w-0 truncate">Set folder date</span>
+              </Button>
+            )}
+            {currentFolderId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
+                disabled={createFolderShare.isPending}
+                onClick={handleShare}
+                tooltip="Create and copy a share link for this folder."
+              >
+                {createFolderShare.isPending ? (
+                  <Loader2 className="size-4 shrink-0 animate-spin" />
                 ) : (
-                  (() => {
-                    const g = grantorData.grantors.find(
-                      (x) => x.delegationId === selectedDelegationId,
-                    );
-                    return g ? (
+                  <Share2 className="size-4 shrink-0" />
+                )}
+                <span className="min-w-0 truncate">Share</span>
+              </Button>
+            )}
+            {preferences !== undefined && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
+                disabled={
+                  setHomeFolderPreference.isPending || isCurrentFolderHome
+                }
+                tooltip="Set this folder as your default landing folder."
+                onClick={() => {
+                  if (isCurrentFolderHome) return;
+                  setHomeFolderPreference.mutate(
+                    { folderId: currentFolderId ?? null },
+                    {
+                      onSuccess: () => {
+                        queryClient.invalidateQueries(
+                          trpc.user.getPreferences.queryOptions(),
+                        );
+                        toast.success("Home folder updated");
+                      },
+                    },
+                  );
+                }}
+              >
+                {setHomeFolderPreference.isPending ? (
+                  <Loader2 className="size-4 shrink-0 animate-spin" />
+                ) : (
+                  <Home className="size-4 shrink-0" />
+                )}
+                <span className="min-w-0 truncate">Set home folder</span>
+              </Button>
+            )}
+            {grantorData && grantorData.grantors.length > 0 && (
+              <Select
+                value={selectedDelegationId ?? "me"}
+                onValueChange={(val) => {
+                  const newId = val === "me" ? null : val;
+                  setSelectedDelegationId(newId);
+                  setPreference.mutate({ delegationId: newId });
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="w-full min-w-0 justify-start"
+                >
+                  {selectedDelegationId === null ? (
+                    <AccountOption
+                      image={session?.user.image}
+                      name={session?.user.name ?? "Me"}
+                    />
+                  ) : (
+                    (() => {
+                      const g = grantorData.grantors.find(
+                        (x) => x.delegationId === selectedDelegationId,
+                      );
+                      return g ? (
+                        <AccountOption
+                          image={g.grantorImage}
+                          name={g.grantorName}
+                        />
+                      ) : (
+                        <SelectValue placeholder="Upload as…" />
+                      );
+                    })()
+                  )}
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value="me">
+                    <AccountOption
+                      image={session?.user.image}
+                      name={session?.user.name ?? "Me"}
+                    />
+                  </SelectItem>
+                  {grantorData.grantors.map((g) => (
+                    <SelectItem key={g.delegationId} value={g.delegationId}>
                       <AccountOption
                         image={g.grantorImage}
                         name={g.grantorName}
                       />
-                    ) : (
-                      <SelectValue placeholder="Upload as…" />
-                    );
-                  })()
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <DropdownMenu>
+              <span className="w-full">
+                <DropdownMenuTrigger data-size="sm" className="w-full min-w-0">
+                  <Plus className="size-4 shrink-0" />
+                  <span className="min-w-0 truncate">Add</span>
+                </DropdownMenuTrigger>
+              </span>
+              <DropdownMenuContent align="end">
+                {isDelegatedAtRoot ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <DropdownMenuItem disabled>
+                          <Upload />
+                          Upload files
+                        </DropdownMenuItem>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      You must upload to a folder when using delegation
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload />
+                    Upload files
+                  </DropdownMenuItem>
                 )}
-              </SelectTrigger>
-              <SelectContent position="popper">
-                <SelectItem value="me">
-                  <AccountOption
-                    image={session?.user.image}
-                    name={session?.user.name ?? "Me"}
-                  />
-                </SelectItem>
-                {grantorData.grantors.map((g) => (
-                  <SelectItem key={g.delegationId} value={g.delegationId}>
-                    <AccountOption
-                      image={g.grantorImage}
-                      name={g.grantorName}
-                    />
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <DropdownMenu>
-            <span className="w-full">
-              <DropdownMenuTrigger data-size="sm" className="w-full min-w-0">
-                <Plus className="size-4 shrink-0" />
-                <span className="min-w-0 truncate">Add</span>
-              </DropdownMenuTrigger>
-            </span>
-            <DropdownMenuContent align="end">
-              {isDelegatedAtRoot ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <DropdownMenuItem disabled>
-                        <Upload />
-                        Upload files
-                      </DropdownMenuItem>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    You must upload to a folder when using delegation
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-                  <Upload />
-                  Upload files
+                <DropdownMenuItem
+                  onClick={() => {
+                    setNewFolderName("");
+                    setNewFolderDialogOpen(true);
+                  }}
+                >
+                  <FolderPlus />
+                  New folder
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onClick={() => {
-                  setNewFolderName("");
-                  setNewFolderDialogOpen(true);
-                }}
-              >
-                <FolderPlus />
-                New folder
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          {currentFolderId && canEditNotes && (
-            <div className="col-span-2 mt-2 lg:flex lg:min-h-0 lg:flex-1">
-              <FolderNoteEditor folderId={currentFolderId} />
+            {currentFolderId && canEditNotes && (
+              <div className="col-span-2 mt-2 lg:flex lg:min-h-0 lg:flex-1">
+                <FolderNoteEditor folderId={currentFolderId} />
+              </div>
+            )}
+          </aside>
+
+          {folders === undefined && (
+            <div className="flex justify-center py-12 [grid-area:content]">
+              <img
+                src="/loading.gif"
+                alt="Loading…"
+                className="w-[60%] max-w-52"
+              />
             </div>
           )}
-        </aside>
 
-        {folders === undefined && (
-          <div className="flex justify-center py-12 [grid-area:content]">
-            <img
-              src="/loading.gif"
-              alt="Loading…"
-              className="w-[60%] max-w-52"
-            />
-          </div>
-        )}
+          {folderSections.length > 0 && (
+            <div className="mt-2 space-y-12 [grid-area:content] lg:mt-6">
+              {folderSections.map((group) => {
+                const isCollapsed =
+                  !!group.heading && collapsedYearKeys.has(group.key);
 
-        {folderSections.length > 0 && (
-          <div className="mt-2 space-y-6 [grid-area:content] lg:mt-6">
-            {folderSections.map((group) => (
-              <section key={group.key} className="space-y-2">
-                {group.heading && (
-                  <h2 className="font-semibold text-(--sea-ink) text-sm uppercase tracking-wide">
-                    {group.heading}
-                  </h2>
-                )}
-                <div className="grid grid-cols-3 gap-4 md:grid-cols-4 lg:grid-cols-5">
-                  {group.folders.map((f) => {
-                    const createdAt = f.resolvedCreationTime;
-                    const monthLabel =
-                      createdAt && !Number.isNaN(createdAt.getTime())
-                        ? monthFormatter.format(createdAt)
-                        : null;
-                    const thumbnailFileId = f.metadata?.thumbnailFileId;
+                return (
+                  <section key={group.key} className="space-y-2">
+                    {group.heading && (
+                      <div className="flex items-center gap-2">
+                        <h2 className="bg-gradient-to-r from-rose-300 via-sky-300 to-violet-300 bg-clip-text font-black text-3xl text-transparent tracking-[0.04em] drop-shadow-[0_2px_0_rgba(255,255,255,0.7)] sm:text-4xl">
+                          {group.heading}
+                        </h2>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="size-8 rounded-full text-(--sea-ink-soft) hover:bg-white/60"
+                          onClick={() => {
+                            setCollapsedYearKeys((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(group.key)) {
+                                next.delete(group.key);
+                              } else {
+                                next.add(group.key);
+                              }
+                              return next;
+                            });
+                          }}
+                          aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${group.heading}`}
+                        >
+                          {isCollapsed ? (
+                            <ChevronRight className="size-4" />
+                          ) : (
+                            <ChevronDown className="size-4" />
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                    {!isCollapsed && (
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 lg:gap-5">
+                        {group.folders.map((f) => {
+                          const createdAt = f.resolvedCreationTime;
+                          const monthLabel =
+                            createdAt && !Number.isNaN(createdAt.getTime())
+                              ? monthFormatter.format(createdAt)
+                              : null;
+                          const showMonthBadgeSkeleton =
+                            !monthLabel &&
+                            !!f.id &&
+                            inFlightCreationTimeFolderIds.has(f.id);
+                          const thumbnailFileId = f.metadata?.thumbnailFileId;
 
-                    return (
-                      <button
-                        key={f.shortcutId ?? f.id}
-                        type="button"
-                        className="relative aspect-square w-full cursor-pointer overflow-hidden rounded-xl border border-(--line) bg-(--surface) hover:opacity-90"
-                        onClick={() =>
-                          openFolder(f.id ?? "", f.name ?? "", f.canEdit)
-                        }
-                      >
-                        {monthLabel && (
-                          <div className="absolute top-1 left-1 z-10 rounded-full bg-black/65 px-2 py-0.5 font-medium text-[10px] text-white">
-                            {monthLabel}
-                          </div>
-                        )}
-                        {f.isShortcut && (
-                          <div className="absolute top-1 right-1 z-10 rounded-lg bg-black/50 p-1 text-white">
-                            <Link className="size-3.5" />
-                          </div>
-                        )}
-                        {thumbnailFileId &&
-                        folderThumbnailLinks?.[thumbnailFileId] ? (
-                          <ThumbnailImage
-                            thumbnailLink={
-                              folderThumbnailLinks[thumbnailFileId]!
-                            }
-                            name={f.name ?? ""}
-                            mimeType="image/"
-                            fitType="cover"
-                            maxWidth={200}
-                          />
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Folder className="size-16 text-(--lagoon-deep)" />
-                          </div>
-                        )}
-                        <div className="absolute right-0 bottom-0 left-0 bg-black/40 px-2 py-1.5">
-                          <div className="flex items-start justify-between gap-1.5">
-                            <span className="line-clamp-2 block h-8 min-w-0 flex-1 font-medium text-white text-xs leading-4">
-                              {f.name}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
-      </div>
-    </main>
+                          return (
+                            <button
+                              key={f.shortcutId ?? f.id}
+                              type="button"
+                              className="group relative aspect-[4/5] w-full cursor-pointer overflow-hidden rounded-[22px] border border-white/55 bg-(--surface-strong) shadow-[0_14px_34px_rgba(23,58,64,0.16)] transition-all duration-300 hover:-translate-y-1.5 hover:scale-[1.015] hover:shadow-[0_24px_42px_rgba(79,184,178,0.28)]"
+                              onClick={() =>
+                                openFolder(f.id ?? "", f.name ?? "", f.canEdit)
+                              }
+                            >
+                              <div className="pointer-events-none absolute -top-12 -right-10 z-0 h-28 w-28 rounded-full bg-sky-200/35 blur-2xl transition-opacity duration-300 group-hover:opacity-95" />
+                              <div className="pointer-events-none absolute -bottom-12 -left-10 z-0 h-28 w-28 rounded-full bg-emerald-200/30 blur-2xl transition-opacity duration-300 group-hover:opacity-95" />
+                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_0%_0%,rgba(255,255,255,0.25)_0%,rgba(255,255,255,0)_50%),radial-gradient(120%_90%_at_100%_100%,rgba(191,219,254,0.2)_0%,rgba(191,219,254,0)_55%)]" />
+                              {monthLabel && (
+                                <div className="absolute top-2 left-2 z-10 rounded-full border border-white/45 bg-black/55 px-2.5 py-0.5 font-semibold text-[11px] text-white backdrop-blur-md">
+                                  {monthLabel}
+                                </div>
+                              )}
+                              {showMonthBadgeSkeleton && (
+                                <div className="absolute top-2 left-2 z-10 rounded-full border border-white/30 bg-black/45 px-2 py-1 backdrop-blur-sm">
+                                  <div className="h-2.5 w-6 animate-pulse rounded-full bg-white/80" />
+                                </div>
+                              )}
+                              {f.isShortcut && (
+                                <div className="absolute top-2 right-2 z-10 rounded-lg border border-white/30 bg-black/45 p-1 text-white backdrop-blur-sm">
+                                  <Link className="size-3.5" />
+                                </div>
+                              )}
+                              {thumbnailFileId &&
+                              folderThumbnailLinks?.[thumbnailFileId] ? (
+                                <>
+                                  <ThumbnailImage
+                                    thumbnailLink={
+                                      folderThumbnailLinks[thumbnailFileId]!
+                                    }
+                                    name={f.name ?? ""}
+                                    mimeType="image/"
+                                    fitType="cover"
+                                    maxWidth={200}
+                                  />
+                                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent transition-opacity duration-300 group-hover:opacity-90" />
+                                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent" />
+                                </>
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-emerald-50 via-sky-50 to-violet-100">
+                                  <div className="absolute -top-8 -right-6 h-20 w-20 rounded-full bg-sky-200/60 blur-xl" />
+                                  <div className="absolute -bottom-8 -left-6 h-20 w-20 rounded-full bg-emerald-200/60 blur-xl" />
+                                  <Folder className="relative z-10 size-16 text-(--lagoon-deep)" />
+                                  <Sparkles className="absolute top-4 right-4 z-10 size-4 text-sky-400/80" />
+                                </div>
+                              )}
+                              <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/25 ring-inset" />
+                              <div className="absolute right-0 bottom-0 left-0 h-[calc(2*1.2em+0.375rem)] border-black/10 border-t bg-white/95 px-3 py-0.75 backdrop-blur-md">
+                                <div className="flex h-full items-center">
+                                  <span className="block min-w-0 flex-1 overflow-hidden text-ellipsis break-normal font-medium text-(--sea-ink) text-[13px] leading-[1.2] tracking-[0.01em] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] [display:-webkit-box] [overflow-wrap:normal]">
+                                    {f.name}
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </main>
+      <SetFolderCreationDateDialog
+        open={setCreationDateDialogOpen}
+        onOpenChange={setSetCreationDateDialogOpen}
+        folderId={selectedFolderForDateEdit?.id ?? null}
+        folderName={selectedFolderForDateEdit?.name}
+      />
+    </>
   );
 }

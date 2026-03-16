@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
 import { useTRPC } from "#/integrations/trpc/react";
-import { cn } from "#/lib/utils";
+import { cn, resolveMediaDateTime } from "#/lib/utils";
 import { ThumbnailImage } from "./ThumbnailImage";
 
 const CAROUSEL_THUMBNAIL_SIZE = 100;
@@ -30,12 +30,8 @@ const CAROUSEL_DATETIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   timeStyle: "short",
 });
 
-function formatMediaDateTime(value?: string | null) {
-  if (!value) return null;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
+function formatMediaDateTime(date: Date | null) {
+  if (!date) return null;
   return CAROUSEL_DATETIME_FORMATTER.format(date);
 }
 
@@ -320,106 +316,116 @@ export function ImageCarousel({
       >
         <CarouselPrevious className="hidden h-[60vh] w-10 rounded-md shadow sm:inline-flex" />
         <CarouselContent className="h-[52vh] min-w-0 flex-1 sm:h-[60vh]">
-          {visibleFiles.map((file, i) => (
-            <CarouselItem key={file.id} className="relative">
-              {Math.abs(i - currentIndex) <= 3 &&
-                (file.mimeType?.startsWith("video/") && i === currentIndex ? (
-                  <DriveVideoPlayer fileId={file.id!} />
-                ) : (
-                  <ThumbnailImage
-                    thumbnailLink={file.thumbnailLink!}
-                    name={file.name ?? ""}
-                    mimeType={file.mimeType ?? ""}
-                    maxWidth={fullImageMaxWidth}
-                    rotateDeg={optimisticRotations[file.id!] ?? 0}
-                    rounded
-                    showBlurBackdrop
-                    blurBackdropSize={CAROUSEL_THUMBNAIL_SIZE}
-                  />
-                ))}
-              {i === currentIndex && file.id && !readOnly && (
-                <div className="absolute top-2 right-2 z-20 flex gap-1">
-                  {folderId &&
-                    onThumbnailSet &&
-                    file.thumbnailLink &&
-                    ancestorFolders.length > 0 && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="border border-white/15 bg-black/65 text-white backdrop-blur-md hover:bg-black/80 hover:text-white"
-                            aria-label="Set as folder thumbnail"
-                          >
-                            <Star
-                              className="size-5"
-                              fill={
-                                currentThumbnailFileId === file.id
-                                  ? "currentColor"
-                                  : "none"
-                              }
-                            />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {ancestorFolders.map((folder) => (
-                            <DropdownMenuItem
-                              key={folder.id}
-                              disabled={!!thumbnailInFlight[folder.id]}
-                              onClick={() =>
-                                handleSetThumbnail(file.id!, folder.id)
-                              }
-                              className="flex items-center gap-2"
+          {visibleFiles.map((file, i) => {
+            const displayDateTime = formatMediaDateTime(
+              resolveMediaDateTime({
+                metadataTime: file.imageMediaMetadata?.time,
+                fileName: file.name,
+                createdTime: file.createdTime,
+                modifiedTime: file.modifiedTime,
+              }),
+            );
+
+            return (
+              <CarouselItem key={file.id} className="relative">
+                {Math.abs(i - currentIndex) <= 3 &&
+                  (file.mimeType?.startsWith("video/") && i === currentIndex ? (
+                    <DriveVideoPlayer fileId={file.id!} />
+                  ) : (
+                    <ThumbnailImage
+                      thumbnailLink={file.thumbnailLink!}
+                      name={file.name ?? ""}
+                      mimeType={file.mimeType ?? ""}
+                      maxWidth={fullImageMaxWidth ?? 1920}
+                      rotateDeg={optimisticRotations[file.id!] ?? 0}
+                      rounded
+                      showBlurBackdrop
+                      blurBackdropSize={CAROUSEL_THUMBNAIL_SIZE}
+                    />
+                  ))}
+                {i === currentIndex && file.id && !readOnly && (
+                  <div className="absolute top-2 right-2 z-20 flex gap-1">
+                    {folderId &&
+                      onThumbnailSet &&
+                      file.thumbnailLink &&
+                      ancestorFolders.length > 0 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="border border-white/15 bg-black/65 text-white backdrop-blur-md hover:bg-black/80 hover:text-white"
+                              aria-label="Set as folder thumbnail"
                             >
-                              {thumbnailInFlight[folder.id] ? (
-                                <Loader2 className="size-4 shrink-0 animate-spin" />
-                              ) : (
-                                <Star
-                                  className="size-4 shrink-0"
-                                  fill={
-                                    folder.thumbnailFileId === file.id
-                                      ? "currentColor"
-                                      : "none"
-                                  }
-                                />
-                              )}
-                              <span>{folder.name}</span>
-                              {folder.id === folderId && (
-                                <span className="ml-auto text-muted-foreground text-xs">
-                                  current
-                                </span>
-                              )}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  {!file.mimeType?.startsWith("video/") && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={!!inFlight[file.id]}
-                      className="border border-white/15 bg-black/65 text-white backdrop-blur-md hover:bg-black/80 hover:text-white disabled:opacity-50"
-                      onClick={() => handleRotateLeft(file.id!)}
-                      aria-label="Rotate left"
-                    >
-                      {inFlight[file.id] ? (
-                        <Loader2 className="direction-[reverse] size-5 animate-spin" />
-                      ) : (
-                        <RotateCcw className="size-5" />
+                              <Star
+                                className="size-5"
+                                fill={
+                                  currentThumbnailFileId === file.id
+                                    ? "currentColor"
+                                    : "none"
+                                }
+                              />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {ancestorFolders.map((folder) => (
+                              <DropdownMenuItem
+                                key={folder.id}
+                                disabled={!!thumbnailInFlight[folder.id]}
+                                onClick={() =>
+                                  handleSetThumbnail(file.id!, folder.id)
+                                }
+                                className="flex items-center gap-2"
+                              >
+                                {thumbnailInFlight[folder.id] ? (
+                                  <Loader2 className="size-4 shrink-0 animate-spin" />
+                                ) : (
+                                  <Star
+                                    className="size-4 shrink-0"
+                                    fill={
+                                      folder.thumbnailFileId === file.id
+                                        ? "currentColor"
+                                        : "none"
+                                    }
+                                  />
+                                )}
+                                <span>{folder.name}</span>
+                                {folder.id === folderId && (
+                                  <span className="ml-auto text-muted-foreground text-xs">
+                                    current
+                                  </span>
+                                )}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
-                    </Button>
-                  )}
-                </div>
-              )}
-              {i === currentIndex &&
-                formatMediaDateTime(file.modifiedTime ?? file.createdTime) && (
-                  <div className="absolute bottom-2 left-6 z-20 rounded-md bg-black px-2 py-1 text-white text-xs">
-                    {formatMediaDateTime(file.modifiedTime ?? file.createdTime)}
+                    {!file.mimeType?.startsWith("video/") && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={!!inFlight[file.id]}
+                        className="border border-white/15 bg-black/65 text-white backdrop-blur-md hover:bg-black/80 hover:text-white disabled:opacity-50"
+                        onClick={() => handleRotateLeft(file.id!)}
+                        aria-label="Rotate left"
+                      >
+                        {inFlight[file.id] ? (
+                          <Loader2 className="direction-[reverse] size-5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="size-5" />
+                        )}
+                      </Button>
+                    )}
                   </div>
                 )}
-            </CarouselItem>
-          ))}
+                {i === currentIndex && displayDateTime && (
+                  <div className="absolute bottom-2 left-6 z-20 rounded-md bg-black px-2 py-1 text-white text-xs">
+                    {displayDateTime}
+                  </div>
+                )}
+              </CarouselItem>
+            );
+          })}
         </CarouselContent>
         <CarouselNext className="hidden h-[60vh] w-10 rounded-md shadow sm:inline-flex" />
       </Carousel>

@@ -11,12 +11,12 @@ function SharePage() {
   const { uuid } = Route.useParams();
   const trpc = useTRPC();
 
-  const { data: shareInfo, isPending } = useQuery({
+  const { data: shareInfo, isLoading } = useQuery({
     ...trpc.share.getShareInfo.queryOptions({ shareId: uuid }),
     retry: false,
   });
 
-  if (isPending) {
+  if (isLoading) {
     return (
       <div className="flex min-h-[calc(100vh-64px)] items-center justify-center">
         <img src="/loading.gif" alt="Loading…" className="w-[60%] max-w-52" />

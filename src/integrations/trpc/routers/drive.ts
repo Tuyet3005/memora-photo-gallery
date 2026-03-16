@@ -277,13 +277,8 @@ export const driveRouter = createTRPCRouter({
         q: `'${parent}' in parents and trashed = false and (mimeType contains 'image/' or mimeType contains 'video/')`,
       });
 
-      const files = (res.data.files ?? []).map((file) => ({
-        ...file,
-        createdTime: file.imageMediaMetadata?.time ?? file.createdTime ?? null,
-      }));
-
       return {
-        files,
+        files: res.data.files ?? [],
         nextCursor: res.data.nextPageToken ?? null,
       };
     }),
@@ -435,5 +430,42 @@ export const driveRouter = createTRPCRouter({
         createdAt: now,
       });
       return { uploadId: id };
+    }),
+
+  /** Updates a folder's creation time in metadata.
+   * Sets the time to 00:01:00 Vietnam time (UTC+7). */
+  updateFolderCreationTime: protectedProcedure
+    .input(
+      z.object({
+        folderId: z.string(),
+        creationDate: z.date(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      // Set time to 00:01:00 Vietnam time (UTC+7)
+      // Create date at 00:01:00 Vietnam time = 23:01:00 previous day UTC
+      const vietnamDate = new Date(input.creationDate);
+      vietnamDate.setHours(0, 1, 0, 0);
+      // Adjust for Vietnam timezone (UTC+7)
+      const utcTime = new Date(vietnamDate.getTime() - 7 * 60 * 60 * 1000);
+
+      const now = new Date();
+      await db
+        .insert(folderMetadata)
+        .values({
+          folderId: input.folderId,
+          creationTime: utcTime,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: folderMetadata.folderId,
+          set: {
+            creationTime: utcTime,
+            updatedAt: now,
+          },
+        });
+
+      return { success: true };
     }),
 });

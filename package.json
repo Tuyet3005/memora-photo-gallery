@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "check": "biome check --write",
+    "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:pull": "drizzle-kit pull",

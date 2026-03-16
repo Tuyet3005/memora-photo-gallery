@@ -137,6 +137,50 @@ export function parseDateTimeFromName(fileName: string): Date | null {
   return null;
 }
 
+type DateLikeInput = string | Date | null | undefined;
+
+function parseDateLikeInput(value: DateLikeInput): Date | null {
+  if (!value) return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+/**
+ * Resolve media datetime with a consistent fallback order:
+ * metadata datetime -> datetime parsed from filename -> created time -> modified time.
+ */
+export function resolveMediaDateTime({
+  metadataTime,
+  fileName,
+  createdTime,
+  modifiedTime,
+}: {
+  metadataTime: DateLikeInput;
+  fileName: string | null | undefined;
+  createdTime: DateLikeInput;
+  modifiedTime: DateLikeInput;
+}): Date | null {
+  const metadataDate = parseDateLikeInput(metadataTime);
+  if (metadataDate) {
+    return metadataDate;
+  }
+
+  if (fileName) {
+    const parsedFromName = parseDateTimeFromName(fileName);
+    if (parsedFromName) {
+      return parsedFromName;
+    }
+  }
+
+  const createdDate = parseDateLikeInput(createdTime);
+  if (createdDate) {
+    return createdDate;
+  }
+
+  return parseDateLikeInput(modifiedTime);
+}
+
 /**
  * Throttle an async function with burst support.
  * Allows up to callsPerSecond executions per one-second window.
