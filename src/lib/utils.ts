@@ -136,3 +136,34 @@ export function parseDateTimeFromName(fileName: string): Date | null {
 
   return null;
 }
+
+/**
+ * Throttle an async function with burst support.
+ * Allows up to callsPerSecond executions per one-second window.
+ * Additional calls wait for the next window.
+ */
+export function throttle<Args extends readonly unknown[], Return>(
+  func: (...args: Args) => Promise<Return>,
+  callsPerSecond: number,
+): (...args: Args) => Promise<Return> {
+  let windowStart = Date.now();
+  let usedInWindow = 0;
+
+  return async (...args: Args) => {
+    while (true) {
+      const now = Date.now();
+      if (now - windowStart >= 1000) {
+        windowStart = now;
+        usedInWindow = 0;
+      }
+
+      if (usedInWindow < callsPerSecond) {
+        usedInWindow += 1;
+        return await func(...args);
+      }
+
+      const waitMs = Math.max(0, 1000 - (now - windowStart));
+      await sleep(waitMs);
+    }
+  };
+}
