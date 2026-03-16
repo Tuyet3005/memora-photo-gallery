@@ -51,3 +51,88 @@ export function groupBy<T>(list: T[], func: (item: T) => string) {
 
   return grouped;
 }
+
+// Date/time components for filename parsing patterns
+const DATE_TIME_PATTERNS_COMPONENTS = {
+  year: "(?<year>\\d{4})",
+  month: "(?<month>\\d{2})",
+  day: "(?<day>\\d{2})",
+  hour: "(?<hour>\\d{2})",
+  minute: "(?<minute>\\d{2})",
+  second: "(?<second>\\d{2})",
+  dateSep: "[_\\s-]",
+  timeSep: "[-:]",
+} as const;
+
+const { year, month, day, hour, minute, second, dateSep, timeSep } =
+  DATE_TIME_PATTERNS_COMPONENTS;
+
+// Regex patterns for parsing dates/times from filenames, in order of specificity
+const DATE_TIME_PARSE_PATTERNS = [
+  // YYYYMMDD HHMMSS with various date/time separators
+  `${year}${month}${day}${dateSep}${hour}${minute}${second}`,
+  // YYYY-MM-DD HH-MM-SS or YYYY-MM-DD HH:MM:SS
+  `${year}-${month}-${day}[_\\s-]${hour}${timeSep}${minute}${timeSep}${second}`,
+  // YYYY_MM_DD_HH_MM_SS
+  `${year}_${month}_${day}_${hour}_${minute}_${second}`,
+  // Date only YYYYMMDD
+  `${year}${month}${day}`,
+  // Date only YYYY-MM-DD
+  `${year}-${month}-${day}`,
+].map((pattern) => new RegExp(`\\b${pattern}\\b`));
+
+/**
+ * Attempt to parse a datetime from a file name using common formats from cameras, phones, and apps.
+ * Supports date/time patterns like: YYYYMMDD, YYYY-MM-DD, HH:MM:SS, HHMMSS
+ * Returns null if no recognized format matches.
+ */
+export function parseDateTimeFromName(fileName: string): Date | null {
+  // Remove file extension for cleaner parsing
+  const nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
+
+  for (const pattern of DATE_TIME_PARSE_PATTERNS) {
+    const groups = nameWithoutExt.match(pattern)?.groups;
+    if (groups) {
+      const yearNum = parseInt(groups.year, 10);
+      const monthNum = parseInt(groups.month, 10);
+      const dayNum = parseInt(groups.day, 10);
+      const hourNum = groups.hour ? parseInt(groups.hour, 10) : 0;
+      const minuteNum = groups.minute ? parseInt(groups.minute, 10) : 0;
+      const secondNum = groups.second ? parseInt(groups.second, 10) : 0;
+
+      // Validate ranges
+      if (
+        yearNum < 1990 ||
+        yearNum > 3000 ||
+        monthNum < 1 ||
+        monthNum > 12 ||
+        dayNum < 1 ||
+        dayNum > 31
+      ) {
+        continue;
+      }
+      if (hourNum > 23 || minuteNum > 59 || secondNum > 59) {
+        continue;
+      }
+
+      // Create date (month is 0-indexed for Date constructor)
+      const date = new Date(
+        yearNum,
+        monthNum - 1,
+        dayNum,
+        hourNum,
+        minuteNum,
+        secondNum,
+      );
+
+      // Verify the date is valid
+      if (Number.isNaN(date.getTime())) {
+        continue;
+      }
+
+      return date;
+    }
+  }
+
+  return null;
+}

@@ -222,9 +222,66 @@ export function GalleryPage() {
     refetchOnWindowFocus: false,
   });
 
+  const fetchFolderCreationTime = useMutation(
+    trpc.drive.fetchFolderCreationTime.mutationOptions(),
+  );
+
+  const [fetchedCreationTimes, setFetchedCreationTimes] = useState<
+    Record<string, Date | null>
+  >({});
+
   // Only hide content when there's no cached data at all for this folder.
   const folders = isFoldersDataPending ? undefined : (foldersData ?? []);
-  const folderList = folders ?? [];
+  const pendingCreationTimeFolderIds = useMemo(
+    () =>
+      (folders ?? [])
+        .filter(
+          (folder) =>
+            fetchedCreationTimes[folder.id] === undefined &&
+            !folder.metadata?.creationTime,
+        )
+        .map((folder) => folder.id),
+    [folders, fetchedCreationTimes],
+  );
+
+  useEffect(() => {
+    if (pendingCreationTimeFolderIds.length === 0) return;
+    if (fetchFolderCreationTime.isPending) return;
+
+    const batchFolderIds = pendingCreationTimeFolderIds.slice(0, 20);
+    if (batchFolderIds.length === 0) return;
+
+    fetchFolderCreationTime
+      .mutateAsync({ folderIds: batchFolderIds })
+      .then((result) => {
+        // Treat any missing IDs as null so they are not retried.
+        const completedBatch = Object.fromEntries(
+          batchFolderIds.map((id) => [id, result[id] ?? null]),
+        ) as Record<string, Date | null>;
+        setFetchedCreationTimes((prev) => ({ ...prev, ...completedBatch }));
+      })
+      .catch(() => {
+        // Mark failed IDs as null so hydration keeps progressing.
+        setFetchedCreationTimes((prev) => ({
+          ...prev,
+          ...Object.fromEntries(batchFolderIds.map((id) => [id, null])),
+        }));
+      });
+  }, [pendingCreationTimeFolderIds, fetchFolderCreationTime]);
+
+  const foldersWithFetchedCreationTime = useMemo(() => {
+    if (!folders) return undefined;
+
+    return folders.map((folder) => ({
+      ...folder,
+      resolvedCreationTime:
+        folder.id && fetchedCreationTimes[folder.id] !== undefined
+          ? fetchedCreationTimes[folder.id]
+          : (folder.metadata?.creationTime ?? null),
+    }));
+  }, [folders, fetchedCreationTimes]);
+
+  const folderList = foldersWithFetchedCreationTime ?? [];
 
   const { foldersByCreationYear, ungroupedFolders } = useMemo(() => {
     const groupableFolders: typeof folderList = [];
@@ -232,7 +289,7 @@ export function GalleryPage() {
 
     for (let i = 0; i < folderList.length; i++) {
       const folder = folderList[i];
-      const createdAt = folder.metadata?.creationTime ?? null;
+      const createdAt = folder.resolvedCreationTime;
       if (!createdAt || Number.isNaN(createdAt.getTime())) {
         ungrouped.push(folder);
         continue;
@@ -243,7 +300,7 @@ export function GalleryPage() {
 
     const byYear = Object.entries(
       groupBy(groupableFolders, (folder) =>
-        String(folder.metadata?.creationTime?.getFullYear()),
+        String(folder.resolvedCreationTime?.getFullYear()),
       ),
     )
       .sort(([leftYear], [rightYear]) => Number(rightYear) - Number(leftYear))
@@ -1071,11 +1128,12 @@ export function GalleryPage() {
                 )}
                 <div className="grid grid-cols-3 gap-4 md:grid-cols-4 lg:grid-cols-5">
                   {group.folders.map((f) => {
-                    const createdAt = f.metadata?.creationTime ?? null;
+                    const createdAt = f.resolvedCreationTime;
                     const monthLabel =
                       createdAt && !Number.isNaN(createdAt.getTime())
                         ? monthFormatter.format(createdAt)
                         : null;
+                    const thumbnailFileId = f.metadata?.thumbnailFileId;
 
                     return (
                       <button
@@ -1096,11 +1154,11 @@ export function GalleryPage() {
                             <Link className="size-3.5" />
                           </div>
                         )}
-                        {f.metadata &&
-                        folderThumbnailLinks?.[f.metadata.thumbnailFileId] ? (
+                        {thumbnailFileId &&
+                        folderThumbnailLinks?.[thumbnailFileId] ? (
                           <ThumbnailImage
                             thumbnailLink={
-                              folderThumbnailLinks[f.metadata.thumbnailFileId]!
+                              folderThumbnailLinks[thumbnailFileId]!
                             }
                             name={f.name ?? ""}
                             mimeType="image/"

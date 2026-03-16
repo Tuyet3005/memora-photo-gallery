@@ -8,7 +8,7 @@ import {
   uploadDelegation,
   user,
 } from "#/db/schema";
-import { getAuthedDrive } from "#/lib/drive";
+import { fetchFolderCreationTimeValue, getAuthedDrive } from "#/lib/drive";
 import { createTRPCRouter, protectedProcedure } from "../init";
 
 export const driveRouter = createTRPCRouter({
@@ -177,6 +177,66 @@ export const driveRouter = createTRPCRouter({
       );
     }),
 
+  /** Fetches each folder's creation time by scanning its media files (EXIF or
+   * filename), stores it in folder metadata, and returns a map of
+   * folderId → creationTime. Returns null if none is found. */
+  fetchFolderCreationTime: protectedProcedure
+    .input(z.object({ folderIds: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      const uniqueFolderIds = Array.from(new Set(input.folderIds)).filter(
+        (id) => id.length > 0,
+      );
+      if (uniqueFolderIds.length === 0) {
+        return {} as Record<string, Date | null>;
+      }
+
+      const drive = await getAuthedDrive(ctx.session.user.id);
+      const createdTimes = await Promise.all(
+        uniqueFolderIds.map(async (folderId) => {
+          try {
+            const creationTime = await fetchFolderCreationTimeValue(
+              drive,
+              folderId,
+            );
+            return { folderId, creationTime };
+          } catch (_e) {
+            return { folderId, creationTime: null as Date | null };
+          }
+        }),
+      );
+
+      if (createdTimes.length > 0) {
+        const now = new Date();
+        await db.transaction(async (tx) => {
+          await tx
+            .insert(folderMetadata)
+            .values(
+              createdTimes.map((row) => ({
+                folderId: row.folderId,
+                thumbnailFileId: null,
+                creationTime: row.creationTime,
+                createdAt: now,
+                updatedAt: now,
+              })),
+            )
+            .onConflictDoNothing({ target: folderMetadata.folderId });
+
+          await Promise.all(
+            createdTimes.map((row) =>
+              tx
+                .update(folderMetadata)
+                .set({ creationTime: row.creationTime, updatedAt: now })
+                .where(eq(folderMetadata.folderId, row.folderId)),
+            ),
+          );
+        });
+      }
+
+      return Object.fromEntries(
+        createdTimes.map((row) => [row.folderId, row.creationTime]),
+      ) as Record<string, Date | null>;
+    }),
+
   /** Paginates images and videos inside the given folder (or Drive root),
    * ordered by name. Supports cursor-based pagination via page tokens. */
   listMedia: protectedProcedure
@@ -195,13 +255,18 @@ export const driveRouter = createTRPCRouter({
         pageSize: input.pageSize,
         pageToken: input.cursor,
         fields:
-          "nextPageToken,files(id,name,mimeType,thumbnailLink,createdTime,modifiedTime)",
+          "nextPageToken,files(id,name,mimeType,thumbnailLink,createdTime,modifiedTime,imageMediaMetadata(time))",
         orderBy: "name",
         q: `'${parent}' in parents and trashed = false and (mimeType contains 'image/' or mimeType contains 'video/')`,
       });
 
+      const files = (res.data.files ?? []).map((file) => ({
+        ...file,
+        createdTime: file.imageMediaMetadata?.time ?? file.createdTime ?? null,
+      }));
+
       return {
-        files: res.data.files ?? [],
+        files,
         nextCursor: res.data.nextPageToken ?? null,
       };
     }),
