@@ -34,3 +34,20 @@ export function sleep(ms: number) {
     setTimeout(resolve, ms);
   });
 }
+
+export function groupBy<T>(list: T[], func: (item: T) => string) {
+  const grouped: Record<string, T[]> = {};
+
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    const key = func(item);
+
+    if (grouped[key]) {
+      grouped[key].push(item);
+    } else {
+      grouped[key] = [item];
+    }
+  }
+
+  return grouped;
+}

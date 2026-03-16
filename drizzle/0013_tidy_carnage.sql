@@ -1,0 +1,1 @@
+ALTER TABLE `folder_metadata` ADD `creation_time` integer;

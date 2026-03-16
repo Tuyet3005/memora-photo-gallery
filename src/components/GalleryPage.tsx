@@ -56,7 +56,7 @@ import {
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
-import { formatDuration, sleep } from "#/lib/utils";
+import { formatDuration, groupBy, sleep } from "#/lib/utils";
 import { ImageCarousel } from "./ImageCarousel";
 import { ThumbnailImage } from "./ThumbnailImage";
 
@@ -224,33 +224,57 @@ export function GalleryPage() {
 
   // Only hide content when there's no cached data at all for this folder.
   const folders = isFoldersDataPending ? undefined : (foldersData ?? []);
+  const folderList = folders ?? [];
 
-  const foldersByCreationYear = useMemo(() => {
-    if (!folders || folders.length === 0) return [];
+  const { foldersByCreationYear, ungroupedFolders } = useMemo(() => {
+    const groupableFolders: typeof folderList = [];
+    const ungrouped: typeof folderList = [];
 
-    const groups = new Map<string, typeof folders>();
+    for (let i = 0; i < folderList.length; i++) {
+      const folder = folderList[i];
+      const createdAt = folder.metadata?.creationTime ?? null;
+      if (!createdAt || Number.isNaN(createdAt.getTime())) {
+        ungrouped.push(folder);
+        continue;
+      }
 
-    for (const folder of folders) {
-      const createdAt = folder.createdTime
-        ? new Date(folder.createdTime)
-        : null;
-      const year =
-        createdAt && !Number.isNaN(createdAt.getTime())
-          ? String(createdAt.getFullYear())
-          : "Unknown";
-      const current = groups.get(year) ?? [];
-      current.push(folder);
-      groups.set(year, current);
+      groupableFolders.push(folder);
     }
 
-    return Array.from(groups.entries())
-      .sort(([leftYear], [rightYear]) => {
-        if (leftYear === "Unknown") return 1;
-        if (rightYear === "Unknown") return -1;
-        return Number(rightYear) - Number(leftYear);
-      })
+    const byYear = Object.entries(
+      groupBy(groupableFolders, (folder) =>
+        String(folder.metadata?.creationTime?.getFullYear()),
+      ),
+    )
+      .sort(([leftYear], [rightYear]) => Number(rightYear) - Number(leftYear))
       .map(([year, groupedFolders]) => ({ year, folders: groupedFolders }));
-  }, [folders]);
+
+    return { foldersByCreationYear: byYear, ungroupedFolders: ungrouped };
+  }, [folderList]);
+
+  const folderSections = useMemo(() => {
+    type FolderSection = {
+      key: string;
+      heading: string | null;
+      folders: typeof folderList;
+    };
+
+    const sections: FolderSection[] = foldersByCreationYear.map((group) => ({
+      key: group.year,
+      heading: group.year,
+      folders: group.folders,
+    }));
+
+    if (ungroupedFolders.length > 0) {
+      sections.push({
+        key: "ungrouped",
+        heading: null,
+        folders: ungroupedFolders,
+      });
+    }
+
+    return sections;
+  }, [foldersByCreationYear, ungroupedFolders]);
 
   const monthFormatter = useMemo(
     () => new Intl.DateTimeFormat("en-US", { month: "short" }),
@@ -259,7 +283,7 @@ export function GalleryPage() {
 
   // Collect fileIds of folders that have a thumbnail set, then fetch fresh links
   const thumbnailFileIds = (folders ?? [])
-    .map((f) => f.thumbnail?.thumbnailFileId)
+    .map((f) => f.metadata?.thumbnailFileId)
     .filter(Boolean) as string[];
   const { data: folderThumbnailLinks } = useQuery({
     ...trpc.drive.getFolderThumbnails.queryOptions({
@@ -280,7 +304,7 @@ export function GalleryPage() {
   });
   const currentFolderThumbnailFileId =
     currentFolderId && parentFoldersData
-      ? (parentFoldersData.find((f) => f.id === currentFolderId)?.thumbnail
+      ? (parentFoldersData.find((f) => f.id === currentFolderId)?.metadata
           ?.thumbnailFileId ?? null)
       : null;
 
@@ -1036,18 +1060,18 @@ export function GalleryPage() {
           </div>
         )}
 
-        {foldersByCreationYear.length > 0 && (
+        {folderSections.length > 0 && (
           <div className="mt-2 space-y-6 [grid-area:content] lg:mt-6">
-            {foldersByCreationYear.map((group) => (
-              <section key={group.year} className="space-y-2">
-                <h2 className="font-semibold text-(--sea-ink) text-sm uppercase tracking-wide">
-                  {group.year}
-                </h2>
+            {folderSections.map((group) => (
+              <section key={group.key} className="space-y-2">
+                {group.heading && (
+                  <h2 className="font-semibold text-(--sea-ink) text-sm uppercase tracking-wide">
+                    {group.heading}
+                  </h2>
+                )}
                 <div className="grid grid-cols-3 gap-4 md:grid-cols-4 lg:grid-cols-5">
                   {group.folders.map((f) => {
-                    const createdAt = f.createdTime
-                      ? new Date(f.createdTime)
-                      : null;
+                    const createdAt = f.metadata?.creationTime ?? null;
                     const monthLabel =
                       createdAt && !Number.isNaN(createdAt.getTime())
                         ? monthFormatter.format(createdAt)
@@ -1072,11 +1096,11 @@ export function GalleryPage() {
                             <Link className="size-3.5" />
                           </div>
                         )}
-                        {f.thumbnail &&
-                        folderThumbnailLinks?.[f.thumbnail.thumbnailFileId] ? (
+                        {f.metadata &&
+                        folderThumbnailLinks?.[f.metadata.thumbnailFileId] ? (
                           <ThumbnailImage
                             thumbnailLink={
-                              folderThumbnailLinks[f.thumbnail.thumbnailFileId]!
+                              folderThumbnailLinks[f.metadata.thumbnailFileId]!
                             }
                             name={f.name ?? ""}
                             mimeType="image/"

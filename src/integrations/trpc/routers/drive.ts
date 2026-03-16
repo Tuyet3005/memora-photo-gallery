@@ -105,7 +105,7 @@ export const driveRouter = createTRPCRouter({
       return normalizedFolders.map((f) => ({
         ...f,
         canEdit: f.capabilities?.canEdit ?? false,
-        thumbnail: f.id ? (thumbnailMap[f.id] ?? null) : null,
+        metadata: f.id ? (thumbnailMap[f.id] ?? null) : null,
       }));
     }),
 
