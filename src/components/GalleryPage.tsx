@@ -47,11 +47,6 @@ import {
   SelectValue,
 } from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "#/components/ui/tooltip";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
@@ -994,19 +989,13 @@ export function GalleryPage() {
               </span>
               <DropdownMenuContent align="end">
                 {isDelegatedAtRoot ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <DropdownMenuItem disabled>
-                          <Upload />
-                          Upload files
-                        </DropdownMenuItem>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      You must upload to a folder when using delegation
-                    </TooltipContent>
-                  </Tooltip>
+                  <DropdownMenuItem
+                    disabled
+                    title="You must upload to a folder when using delegation"
+                  >
+                    <Upload />
+                    Upload files
+                  </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem
                     onClick={() => fileInputRef.current?.click()}

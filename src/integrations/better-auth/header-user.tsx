@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { Home, LogOut, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { GrantDelegationDialog } from "#/components/GrantDelegationDialog";
@@ -25,19 +25,16 @@ export default function BetterAuthHeader() {
     return (
       <div className="flex items-center gap-2">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              aria-label="Open account menu"
-            >
-              <Avatar className="size-8">
-                <AvatarImage src={session.user.image ?? undefined} alt="" />
-                <AvatarFallback className="text-xs">
-                  {session.user.name?.charAt(0).toUpperCase() || "U"}
-                </AvatarFallback>
-              </Avatar>
-            </button>
+          <DropdownMenuTrigger
+            className="rounded-full p-0 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            aria-label="Open account menu"
+          >
+            <Avatar className="size-8">
+              <AvatarImage src={session.user.image ?? undefined} alt="" />
+              <AvatarFallback className="text-xs">
+                {session.user.name?.charAt(0).toUpperCase() || "U"}
+              </AvatarFallback>
+            </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
@@ -93,8 +90,14 @@ export default function BetterAuthHeader() {
   }
 
   return (
-    <Button variant="outline" size="sm" asChild>
-      <Link to="/signin">Sign in</Link>
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        navigate({ to: "/signin" });
+      }}
+    >
+      Sign in
     </Button>
   );
 }

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { GalleryPage } from "#/components/GalleryPage";
 import { Button } from "#/components/ui/button";
@@ -108,17 +108,21 @@ function LandingPage() {
               color: "#fff",
               border: "none",
             }}
-            asChild
+            onClick={() => {
+              window.location.assign("/signin");
+            }}
           >
-            <Link to="/signin">Get started — it's free</Link>
+            Get started — it's free
           </Button>
           <Button
             variant="outline"
             size="lg"
             className="rounded-full border-(--chip-line) bg-(--chip-bg) px-8 font-semibold text-(--sea-ink) text-base backdrop-blur-sm transition-all hover:-translate-y-0.5"
-            asChild
+            onClick={() => {
+              window.location.assign("/signin");
+            }}
           >
-            <Link to="/signin">Sign in</Link>
+            Sign in
           </Button>
         </div>
 
@@ -277,9 +281,11 @@ function LandingPage() {
               color: "#fff",
               border: "none",
             }}
-            asChild
+            onClick={() => {
+              window.location.assign("/signin");
+            }}
           >
-            <Link to="/signin">Get started</Link>
+            Get started
           </Button>
         </div>
       </section>
