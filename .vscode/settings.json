@@ -34,5 +34,8 @@
     "editor.defaultFormatter": "biomejs.biome"
   },
   "git.branchProtectionPrompt": "alwaysCommit",
-  "editor.indentSize": 2
+  "editor.indentSize": 2,
+  "chat.tools.terminal.autoApprove": {
+    "npm install": true
+  }
 }

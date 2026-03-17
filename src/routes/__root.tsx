@@ -1,3 +1,4 @@
+import { PostHogErrorBoundary, PostHogProvider } from "@posthog/react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -14,6 +15,11 @@ import { TooltipProvider } from "../components/ui/tooltip";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import TanStackQueryProvider from "../integrations/tanstack-query/root-provider";
 import appCss from "../styles.css?url";
+
+const posthogOptions = {
+  api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST as string,
+  defaults: "2026-01-30",
+} as const;
 
 interface MyRouterContext {
   queryClient: QueryClient;
@@ -56,24 +62,31 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="wrap-anywhere font-sans antialiased">
-        <TanStackQueryProvider>
-          <TooltipProvider>
-            <Header />
-            {children}
-            <TanStackDevtools
-              config={{
-                position: "bottom-right",
-              }}
-              plugins={[
-                {
-                  name: "Tanstack Router",
-                  render: <TanStackRouterDevtoolsPanel />,
-                },
-                TanStackQueryDevtools,
-              ]}
-            />
-          </TooltipProvider>
-        </TanStackQueryProvider>
+        <PostHogProvider
+          apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string}
+          options={posthogOptions}
+        >
+          <PostHogErrorBoundary>
+            <TanStackQueryProvider>
+              <TooltipProvider>
+                <Header />
+                {children}
+                <TanStackDevtools
+                  config={{
+                    position: "bottom-right",
+                  }}
+                  plugins={[
+                    {
+                      name: "Tanstack Router",
+                      render: <TanStackRouterDevtoolsPanel />,
+                    },
+                    TanStackQueryDevtools,
+                  ]}
+                />
+              </TooltipProvider>
+            </TanStackQueryProvider>
+          </PostHogErrorBoundary>
+        </PostHogProvider>
         <Toaster />
         <Scripts />
       </body>
