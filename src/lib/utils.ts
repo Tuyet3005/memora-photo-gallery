@@ -35,6 +35,76 @@ export function sleep(ms: number) {
   });
 }
 
+function parseResumableRangeHeader(rangeHeader: string | null): number | null {
+  if (!rangeHeader) return null;
+  const match = rangeHeader.match(/bytes=\d+-(\d+)$/);
+  if (!match) return null;
+  const end = Number(match[1]);
+  return Number.isFinite(end) ? end + 1 : null;
+}
+
+async function readHttpErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = await response.json();
+    if (body?.error?.message && typeof body.error.message === "string") {
+      return body.error.message;
+    }
+    if (body?.error && typeof body.error === "string") {
+      return body.error;
+    }
+  } catch {
+    // Fall back to text body for non-JSON responses.
+  }
+
+  const text = await response.text().catch(() => "");
+  return text || `Upload failed (${response.status})`;
+}
+
+/** Uploads a file to a Google Drive resumable session URI in 4MB chunks. */
+export async function uploadFileToResumableUri(
+  _resumableUri: string,
+  file: File,
+  uploadId: string,
+  chunkSize = 4 * 1024 * 1024,
+): Promise<void> {
+  const totalSize = file.size;
+
+  if (totalSize < 1) {
+    throw new Error("Empty files are not supported for resumable upload.");
+  }
+
+  let offset = 0;
+
+  while (offset < totalSize) {
+    const nextOffset = Math.min(offset + chunkSize, totalSize);
+    const chunk = file.slice(offset, nextOffset);
+
+    const response = await fetch(`/api/upload/${uploadId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        "Content-Range": `bytes ${offset}-${nextOffset - 1}/${totalSize}`,
+      },
+      body: chunk,
+    });
+
+    if (response.status === 308) {
+      const acknowledgedOffset = parseResumableRangeHeader(
+        response.headers.get("Range"),
+      );
+      offset = acknowledgedOffset ?? nextOffset;
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(await readHttpErrorMessage(response));
+    }
+
+    // A 2xx response indicates Drive accepted the final chunk.
+    offset = totalSize;
+  }
+}
+
 export function groupBy<T>(list: T[], func: (item: T) => string) {
   const grouped: Record<string, T[]> = {};
 

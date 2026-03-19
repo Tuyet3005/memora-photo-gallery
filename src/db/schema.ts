@@ -58,13 +58,8 @@ export const verification = sqliteTable("verification", {
 
 export const signedUpload = sqliteTable("signed_upload", {
   id: text().primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  folderId: text("folder_id"),
-  fileName: text("file_name").notNull(),
-  mimeType: text("mime_type").notNull(),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  resumableUri: text("resumable_uri").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 

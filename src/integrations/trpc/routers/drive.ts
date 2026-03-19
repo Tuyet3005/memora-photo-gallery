@@ -8,7 +8,11 @@ import {
   uploadDelegation,
   user,
 } from "#/db/schema";
-import { fetchFolderCreationTimeValue, getAuthedDrive } from "#/lib/drive";
+import {
+  fetchFolderCreationTimeValue,
+  getAuthedDrive,
+  initResumableUpload,
+} from "#/lib/drive";
 import { createTRPCRouter, protectedProcedure } from "../init";
 
 export const driveRouter = createTRPCRouter({
@@ -354,14 +358,16 @@ export const driveRouter = createTRPCRouter({
       };
     }),
 
-  /** Issues a short-lived signed upload token inserted into the database.
+  /** Initiates a resumable Google Drive upload session on behalf of the authenticated user.
    * When a delegation ID is supplied, the upload is attributed to the grantor
-   * and the target folder is shared with them so they can access the file. */
+   * and the target folder is shared with them so they can access the file.
+   * Returns a pre-authenticated resumable session URI the client uploads to directly. */
   generateUploadUrl: protectedProcedure
     .input(
       z.object({
         fileName: z.string(),
         mimeType: z.string(),
+        fileSize: z.number().int().min(1),
         folderId: z.string().optional(),
         uploadDelegationId: z.string().optional(),
       }),
@@ -418,18 +424,37 @@ export const driveRouter = createTRPCRouter({
         }
       }
 
+      const parent = input.folderId ?? "root";
+
+      // Initiate a resumable upload session with Google Drive.
+      let resumableUri: string;
+      try {
+        resumableUri = await initResumableUpload({
+          userId: effectiveUserId,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          parent,
+          fileSize: input.fileSize,
+        });
+      } catch (err) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            err instanceof Error ? err.message : "Upload initiation failed",
+          cause: err,
+        });
+      }
+
       const id = crypto.randomUUID();
       const now = new Date();
       await db.insert(signedUpload).values({
         id,
-        userId: effectiveUserId,
-        folderId: input.folderId ?? null,
-        fileName: input.fileName,
-        mimeType: input.mimeType,
-        expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+        fileSize: input.fileSize,
+        resumableUri,
         createdAt: now,
       });
-      return { uploadId: id };
+
+      return { uploadId: id, resumableUri };
     }),
 
   /** Updates a folder's creation time in metadata.

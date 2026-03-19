@@ -1,10 +1,9 @@
-import { Readable } from "node:stream";
 import { createFileRoute } from "@tanstack/react-router";
-import { and, eq, gt } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "#/db/index";
-import { imageOriginalVersion, signedUpload } from "#/db/schema";
-import { getAuthedDrive } from "#/lib/drive";
+import { signedUpload } from "#/db/schema";
 
+/** Proxies upload chunks to Google Drive from the server to avoid browser CORS on resumable uploads. */
 async function handler({ request }: { request: Request }) {
   const url = new URL(request.url);
   const uploadId = url.pathname.split("/api/upload/")[1];
@@ -13,88 +12,69 @@ async function handler({ request }: { request: Request }) {
     return Response.json({ error: "Missing upload ID" }, { status: 400 });
   }
 
-  const now = new Date();
   const row = await db
     .select()
     .from(signedUpload)
-    .where(and(eq(signedUpload.id, uploadId), gt(signedUpload.expiresAt, now)))
+    .where(eq(signedUpload.id, uploadId))
     .limit(1)
     .get();
 
   if (!row) {
-    return Response.json(
-      { error: "Upload token not found or expired" },
-      { status: 401 },
-    );
+    return Response.json({ error: "Upload token not found" }, { status: 401 });
   }
 
-  let formData: FormData;
+  const contentRange = request.headers.get("Content-Range");
+  if (!contentRange) {
+    return Response.json({ error: "Missing Content-Range" }, { status: 400 });
+  }
+
+  let bytes: Uint8Array;
   try {
-    formData = await request.formData();
+    bytes = new Uint8Array(await request.arrayBuffer());
   } catch {
-    return Response.json({ error: "Invalid multipart body" }, { status: 400 });
+    return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return Response.json({ error: "Missing file field" }, { status: 400 });
-  }
-
-  let drive: Awaited<ReturnType<typeof getAuthedDrive>>;
-  try {
-    drive = await getAuthedDrive(row.userId);
-  } catch {
-    return Response.json(
-      { error: "No Google access token. Please sign in again." },
-      { status: 401 },
-    );
+  if (bytes.byteLength < 1) {
+    return Response.json({ error: "Chunk body is required" }, { status: 400 });
   }
 
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const parent = row.folderId ?? "root";
-
-    // Check if a file with the same name already exists in the target folder
-    const existing = await drive.files.list({
-      q: `'${parent}' in parents and name = '${row.fileName.replace(/'/g, "\\'")}' and trashed = false`,
-      fields: "files(id)",
-      pageSize: 1,
+    const uploadResponse = await fetch(row.resumableUri, {
+      method: "PUT",
+      headers: {
+        "Content-Type":
+          request.headers.get("Content-Type") ?? "application/octet-stream",
+        "Content-Range": contentRange,
+      },
+      body: Buffer.from(bytes),
     });
-    const existingId = existing.data.files?.[0]?.id;
 
-    const resData = existingId
-      ? (
-          await drive.files.update({
-            fileId: existingId,
-            media: { mimeType: row.mimeType, body: Readable.from(buffer) },
-            fields: "id,name,mimeType",
-          })
-        ).data
-      : (
-          await drive.files.create({
-            requestBody: { name: row.fileName, parents: [parent] },
-            media: { mimeType: row.mimeType, body: Readable.from(buffer) },
-            fields: "id,name,mimeType",
-          })
-        ).data;
+    if (uploadResponse.status === 308) {
+      return new Response(null, {
+        status: 308,
+        headers: {
+          Range: uploadResponse.headers.get("Range") ?? "",
+        },
+      });
+    }
 
-    await Promise.all([
-      db.delete(signedUpload).where(eq(signedUpload.id, uploadId)),
-      existingId &&
-        db
-          .delete(imageOriginalVersion)
-          .where(eq(imageOriginalVersion.fileId, existingId)),
-    ]);
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text().catch(() => "");
+      return Response.json(
+        { error: errorText || "Google Drive upload chunk failed" },
+        { status: 502 },
+      );
+    }
 
-    return Response.json(
-      { fileId: resData.id, name: resData.name, mimeType: resData.mimeType },
-      { status: 200 },
-    );
+    // A successful non-308 response means Drive accepted the final chunk.
+    await db.delete(signedUpload).where(eq(signedUpload.id, uploadId));
+
+    return Response.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error("Google Drive upload error:", error);
-
+    console.error("Google Drive chunk upload proxy error:", error);
     return Response.json(
-      { error: "Google Drive upload failed" },
+      { error: "Google Drive upload chunk failed" },
       { status: 502 },
     );
   }
@@ -103,7 +83,7 @@ async function handler({ request }: { request: Request }) {
 export const Route = createFileRoute("/api/upload/$")({
   server: {
     handlers: {
-      POST: handler,
+      PUT: handler,
     },
   },
 });

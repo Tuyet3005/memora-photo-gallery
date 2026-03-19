@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { type drive_v3, google } from "googleapis";
 import { db } from "#/db/index";
-import { account } from "#/db/schema";
+import { account, imageOriginalVersion } from "#/db/schema";
 import { resolveMediaDateTime, throttle } from "#/lib/utils";
 
 export type FetchFolderCreationTimeResult = {
@@ -10,7 +10,9 @@ export type FetchFolderCreationTimeResult = {
   fetchedFolders: Record<string, Date>;
 };
 
-export async function getAuthedDrive(userId: string) {
+/** Builds an authenticated Google OAuth2 client for the given user,
+ * persisting refreshed tokens back to the database. */
+async function buildOAuth2Client(userId: string) {
   const googleAccount = await db
     .select()
     .from(account)
@@ -49,7 +51,103 @@ export async function getAuthedDrive(userId: string) {
       .where(eq(account.id, googleAccount.id));
   });
 
+  return oauth2;
+}
+
+export async function getAuthedDrive(userId: string) {
+  const oauth2 = await buildOAuth2Client(userId);
   return google.drive({ version: "v3", auth: oauth2 });
+}
+
+/** Initiates a Google Drive resumable upload session and returns the session URI.
+ * Pass `existingId` to overwrite an existing file (uses PATCH), otherwise a new file is created.
+ * The returned URI is used by the client to PUT the file bytes directly to Google Drive. */
+export async function initResumableUpload({
+  userId,
+  fileName,
+  mimeType,
+  parent,
+  fileSize,
+  existingId,
+}: {
+  userId: string;
+  fileName: string;
+  mimeType: string;
+  parent: string;
+  fileSize?: number;
+  existingId?: string | null;
+}): Promise<string> {
+  const oauth2 = await buildOAuth2Client(userId);
+  const drive = google.drive({ version: "v3", auth: oauth2 });
+
+  // Prefer currently stored access token to avoid forcing a refresh
+  // (which can fail with invalid_grant for stale/revoked refresh tokens).
+  let accessToken = oauth2.credentials.access_token ?? undefined;
+  if (!accessToken) {
+    try {
+      const tokenResult = await oauth2.getAccessToken();
+      accessToken = tokenResult.token ?? undefined;
+    } catch {
+      throw new Error(
+        "No Google access token available. Please sign in again.",
+      );
+    }
+  }
+
+  if (!accessToken) {
+    throw new Error("No Google access token available. Please sign in again.");
+  }
+
+  let matchedExistingId = existingId ?? null;
+  if (!matchedExistingId) {
+    const existing = await drive.files.list({
+      q: `'${parent}' in parents and name = '${fileName.replace(/'/g, "\\'")}' and trashed = false`,
+      fields: "files(id)",
+      pageSize: 1,
+    });
+    matchedExistingId = existing.data.files?.[0]?.id ?? null;
+  }
+
+  // When replacing an existing file, clear the cached original-version row.
+  if (matchedExistingId) {
+    await db
+      .delete(imageOriginalVersion)
+      .where(eq(imageOriginalVersion.fileId, matchedExistingId));
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+    "X-Upload-Content-Type": mimeType,
+  };
+  if (fileSize !== undefined) {
+    headers["X-Upload-Content-Length"] = String(fileSize);
+  }
+
+  const url = matchedExistingId
+    ? `https://www.googleapis.com/upload/drive/v3/files/${matchedExistingId}?uploadType=resumable`
+    : "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable";
+  const body = matchedExistingId ? {} : { name: fileName, parents: [parent] };
+
+  const resp = await fetch(url, {
+    method: matchedExistingId ? "PATCH" : "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(
+      `Failed to initiate Google Drive upload session: ${errText}`,
+    );
+  }
+
+  const location = resp.headers.get("Location");
+  if (!location) {
+    throw new Error("No resumable upload URI returned by Google Drive.");
+  }
+
+  return location;
 }
 
 /** Scans a folder's media files to find the earliest creation time from EXIF or filename.

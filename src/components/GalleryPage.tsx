@@ -50,7 +50,7 @@ import { Textarea } from "#/components/ui/textarea";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
-import { formatDuration, sleep } from "#/lib/utils";
+import { formatDuration, sleep, uploadFileToResumableUri } from "#/lib/utils";
 import { FoldersList } from "./FoldersList";
 import { ImageCarousel } from "./ImageCarousel";
 import { SetFolderCreationDateDialog } from "./SetFolderCreationDateDialog";
@@ -456,25 +456,15 @@ export function GalleryPage() {
       }
 
       try {
-        const { uploadId } = await generateUploadUrl.mutateAsync({
+        const { uploadId, resumableUri } = await generateUploadUrl.mutateAsync({
           fileName: file.name,
           mimeType: file.type,
+          fileSize: file.size,
           folderId: currentFolderId,
           uploadDelegationId: selectedDelegationId ?? undefined,
         });
 
-        const form = new FormData();
-        form.append("file", file);
-
-        const res = await fetch(`/api/upload/${uploadId}`, {
-          method: "POST",
-          body: form,
-        });
-
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body?.error ?? `Upload failed (${res.status})`);
-        }
+        await uploadFileToResumableUri(resumableUri, file, uploadId);
 
         setUploadEntries((prev) =>
           prev.map((e) =>
