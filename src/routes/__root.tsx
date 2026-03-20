@@ -67,6 +67,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         {/** biome-ignore lint/security/noDangerouslySetInnerHtml: Fixed content */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <meta
+          name="google-site-verification"
+          content="CkyqP2KN4s78WeI93iNkcwPKTDH2JWQ18zsccLznax0"
+        />
         <HeadContent />
       </head>
       <body className="wrap-anywhere font-sans antialiased">
