@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { authClient } from "#/lib/auth-client";
 
 export const Route = createFileRoute("/signin")({ component: SignIn });
@@ -45,6 +45,14 @@ function SignIn() {
           </svg>
           Continue with Google
         </button>
+        <div className="mt-6 text-center">
+          <Link
+            to="/privacy-policy"
+            className="text-[var(--sea-ink-soft)] text-sm underline-offset-4 transition hover:text-[var(--sea-ink)] hover:underline"
+          >
+            Privacy Policy
+          </Link>
+        </div>
       </div>
     </main>
   );

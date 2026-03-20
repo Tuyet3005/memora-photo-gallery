@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
 import { GalleryPage } from "#/components/GalleryPage";
 import { Button } from "#/components/ui/button";
@@ -127,9 +127,17 @@ function LandingPage() {
         </div>
 
         {/* Social proof hint */}
-        <p className="mt-8 text-(--sea-ink-soft) text-sm">
-          Private by default &middot; No ads &middot; Always yours
-        </p>
+        <div className="mt-8 flex flex-col items-center gap-3 text-sm">
+          <p className="text-(--sea-ink-soft)">
+            Private by default &middot; No ads &middot; Always yours
+          </p>
+          <Link
+            to="/privacy-policy"
+            className="rounded-full border border-(--chip-line) bg-(--chip-bg) px-4 py-1.5 font-semibold text-(--sea-ink) transition hover:bg-(--link-bg-hover)"
+          >
+            Privacy Policy
+          </Link>
+        </div>
       </section>
 
       {/* Feature grid */}
