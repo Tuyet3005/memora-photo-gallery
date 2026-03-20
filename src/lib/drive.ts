@@ -34,8 +34,8 @@ async function buildOAuth2Client(userId: string) {
 
   oauth2.setCredentials({
     access_token: googleAccount.accessToken,
-    refresh_token: googleAccount.refreshToken ?? undefined,
-    expiry_date: googleAccount.accessTokenExpiresAt?.getTime() ?? undefined,
+    refresh_token: googleAccount.refreshToken,
+    expiry_date: googleAccount.accessTokenExpiresAt?.getTime(),
   });
 
   oauth2.on("tokens", async (tokens) => {

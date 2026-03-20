@@ -29,6 +29,18 @@ export function formatDuration(totalSeconds: number) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+export function formatSizeProgress(uploadedBytes: number, totalBytes: number) {
+  const oneMB = 1024 * 1024;
+  const totalMB = totalBytes / oneMB;
+  const uploadedMB = uploadedBytes / oneMB;
+
+  if (totalMB > 1024) {
+    return `${(uploadedMB / 1024).toFixed(1)}/${(totalMB / 1024).toFixed(1)} GB`;
+  }
+
+  return `${uploadedMB.toFixed(1)}/${totalMB.toFixed(1)} MB`;
+}
+
 export function sleep(ms: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
@@ -65,6 +77,7 @@ export async function uploadFileToResumableUri(
   _resumableUri: string,
   file: File,
   uploadId: string,
+  onProgress?: (uploadedBytes: number) => void,
   chunkSize = 4 * 1024 * 1024,
 ): Promise<void> {
   const totalSize = file.size;
@@ -93,6 +106,7 @@ export async function uploadFileToResumableUri(
         response.headers.get("Range"),
       );
       offset = acknowledgedOffset ?? nextOffset;
+      onProgress?.(offset);
       continue;
     }
 
@@ -102,6 +116,7 @@ export async function uploadFileToResumableUri(
 
     // A 2xx response indicates Drive accepted the final chunk.
     offset = totalSize;
+    onProgress?.(totalSize);
   }
 }
 

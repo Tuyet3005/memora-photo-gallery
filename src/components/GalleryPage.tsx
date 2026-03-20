@@ -50,7 +50,12 @@ import { Textarea } from "#/components/ui/textarea";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
-import { formatDuration, sleep, uploadFileToResumableUri } from "#/lib/utils";
+import {
+  formatDuration,
+  formatSizeProgress,
+  sleep,
+  uploadFileToResumableUri,
+} from "#/lib/utils";
 import { FoldersList } from "./FoldersList";
 import { ImageCarousel } from "./ImageCarousel";
 import { SetFolderCreationDateDialog } from "./SetFolderCreationDateDialog";
@@ -65,6 +70,8 @@ interface FolderStack {
 
 interface FileUploadEntry {
   name: string;
+  size: number;
+  uploadedBytes: number;
   status: FileUploadStatus;
   error?: string;
 }
@@ -378,8 +385,18 @@ export function GalleryPage() {
   const failedUploads = uploadEntries.filter(
     (e) => e.status === "error",
   ).length;
+  const totalUploadBytes = uploadEntries.reduce(
+    (sum, entry) => sum + entry.size,
+    0,
+  );
+  const uploadedBytes = uploadEntries.reduce(
+    (sum, entry) => sum + Math.min(entry.uploadedBytes, entry.size),
+    0,
+  );
   const uploadProgressPercent =
-    totalUploads > 0 ? Math.round((completedUploads / totalUploads) * 100) : 0;
+    totalUploadBytes > 0
+      ? Math.round((uploadedBytes / totalUploadBytes) * 100)
+      : 0;
   const isDelegatedAtRoot = !!selectedDelegationId && !currentFolderId;
   const isMemoraFolder = currentFolder?.name === MEMORA_ROOT_NAME;
   const isCurrentFolderHome =
@@ -390,17 +407,18 @@ export function GalleryPage() {
   const elapsedUploadSeconds = uploadStartedAt
     ? Math.max(0.001, (uploadNow - uploadStartedAt) / 1000)
     : 0;
-  const remainingUploads = Math.max(0, totalUploads - completedUploads);
+  const remainingBytes = Math.max(0, totalUploadBytes - uploadedBytes);
   const fallbackEtaSeconds =
-    totalUploads > 0
+    totalUploadBytes > 0
       ? Math.ceil(
-          (remainingUploads / UPLOAD_BATCH_SIZE) *
-            (MIN_BATCH_DURATION_MS / 1000),
+          (remainingBytes / Math.max(1, totalUploadBytes)) *
+            (MIN_BATCH_DURATION_MS / 1000) *
+            Math.ceil(totalUploads / UPLOAD_BATCH_SIZE),
         )
       : 0;
   const computedEtaSeconds =
-    uploadStartedAt && completedUploads > 0
-      ? Math.ceil(remainingUploads / (completedUploads / elapsedUploadSeconds))
+    uploadStartedAt && uploadedBytes > 0
+      ? Math.ceil(remainingBytes / (uploadedBytes / elapsedUploadSeconds))
       : fallbackEtaSeconds;
   const etaSeconds = uploading ? Math.max(0, computedEtaSeconds) : 0;
 
@@ -436,24 +454,26 @@ export function GalleryPage() {
     );
   }
 
-  async function uploadOne(file: File): Promise<void> {
+  async function uploadOne(entry: FileUploadEntry, file: File): Promise<void> {
     const MAX_ATTEMPTS = 3;
     let lastError = "Upload failed";
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      if (attempt > 1) {
-        setUploadEntries((prev) =>
-          prev.map((e) =>
-            e.name === file.name
-              ? {
-                  ...e,
-                  status: "retrying",
-                  error: `Retrying (${attempt}/${MAX_ATTEMPTS})…`,
-                }
-              : e,
-          ),
-        );
-      }
+      setUploadEntries((prev) =>
+        prev.map((e) =>
+          e.name === entry.name
+            ? {
+                ...e,
+                uploadedBytes: attempt > 1 ? 0 : e.uploadedBytes,
+                status: attempt > 1 ? "retrying" : "pending",
+                error:
+                  attempt > 1
+                    ? `Retrying (${attempt}/${MAX_ATTEMPTS})…`
+                    : undefined,
+              }
+            : e,
+        ),
+      );
 
       try {
         const { uploadId, resumableUri } = await generateUploadUrl.mutateAsync({
@@ -464,12 +484,36 @@ export function GalleryPage() {
           uploadDelegationId: selectedDelegationId ?? undefined,
         });
 
-        await uploadFileToResumableUri(resumableUri, file, uploadId);
+        await uploadFileToResumableUri(
+          resumableUri,
+          file,
+          uploadId,
+          (nextUploadedBytes) => {
+            setUploadEntries((prev) =>
+              prev.map((e) =>
+                e.name === entry.name
+                  ? {
+                      ...e,
+                      uploadedBytes: Math.max(
+                        e.uploadedBytes,
+                        Math.min(nextUploadedBytes, e.size),
+                      ),
+                    }
+                  : e,
+              ),
+            );
+          },
+        );
 
         setUploadEntries((prev) =>
           prev.map((e) =>
-            e.name === file.name
-              ? { ...e, status: "done", error: undefined }
+            e.name === entry.name
+              ? {
+                  ...e,
+                  uploadedBytes: e.size,
+                  status: "done",
+                  error: undefined,
+                }
               : e,
           ),
         );
@@ -481,7 +525,7 @@ export function GalleryPage() {
 
     setUploadEntries((prev) =>
       prev.map((e) =>
-        e.name === file.name ? { ...e, status: "error", error: lastError } : e,
+        e.name === entry.name ? { ...e, status: "error", error: lastError } : e,
       ),
     );
   }
@@ -490,8 +534,19 @@ export function GalleryPage() {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
 
-    const entries: FileUploadEntry[] = files.map((f) => ({
+    const seenNames = new Set<string>();
+    const uniqueFiles = files.filter((file) => {
+      if (seenNames.has(file.name)) {
+        return false;
+      }
+      seenNames.add(file.name);
+      return true;
+    });
+
+    const entries: FileUploadEntry[] = uniqueFiles.map((f) => ({
       name: f.name,
+      size: f.size,
+      uploadedBytes: 0,
       status: "pending",
     }));
     setUploadEntries(entries);
@@ -500,14 +555,19 @@ export function GalleryPage() {
     setUploadDialogOpen(true);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
-    for (let i = 0; i < files.length; i += UPLOAD_BATCH_SIZE) {
-      const batch = files.slice(i, i + UPLOAD_BATCH_SIZE);
+    const filesWithEntries = uniqueFiles.map((file, index) => ({
+      file,
+      entry: entries[index],
+    }));
+
+    for (let i = 0; i < filesWithEntries.length; i += UPLOAD_BATCH_SIZE) {
+      const batch = filesWithEntries.slice(i, i + UPLOAD_BATCH_SIZE);
       const batchStartedAt = Date.now();
 
-      await Promise.all(batch.map(uploadOne));
+      await Promise.all(batch.map((item) => uploadOne(item.entry, item.file)));
 
       const elapsedMs = Date.now() - batchStartedAt;
-      const hasNextBatch = i + UPLOAD_BATCH_SIZE < files.length;
+      const hasNextBatch = i + UPLOAD_BATCH_SIZE < filesWithEntries.length;
       if (hasNextBatch && elapsedMs < MIN_BATCH_DURATION_MS) {
         await sleep(MIN_BATCH_DURATION_MS - elapsedMs);
       }
@@ -557,15 +617,15 @@ export function GalleryPage() {
         <Dialog
           open={uploadDialogOpen}
           onOpenChange={(open) => {
-            if (uploading && !open) return;
-            setUploadDialogOpen(open);
+            if (!open) return;
+            setUploadDialogOpen(true);
           }}
         >
           <DialogContent
             className="max-w-md"
-            showCloseButton={!uploading}
-            onInteractOutside={(e) => uploading && e.preventDefault()}
-            onEscapeKeyDown={(e) => uploading && e.preventDefault()}
+            showCloseButton={false}
+            onInteractOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
           >
             <DialogHeader>
               <DialogTitle>
@@ -585,7 +645,8 @@ export function GalleryPage() {
                     {failedUploads > 0 ? ` (${failedUploads} failed)` : ""}
                   </span>
                   <span>
-                    {uploadProgressPercent}%
+                    {uploadProgressPercent}% (
+                    {formatSizeProgress(uploadedBytes, totalUploadBytes)})
                     {uploading ? ` · ETA ${formatDuration(etaSeconds)}` : ""}
                   </span>
                 </div>
@@ -609,8 +670,16 @@ export function GalleryPage() {
                 {uploadEntries.map((entry) => (
                   <li
                     key={entry.name}
-                    className="flex items-start gap-2 text-sm"
+                    className="flex items-stretch gap-2 text-sm"
                   >
+                    <div className="mt-0.5 h-10 w-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full w-full origin-bottom bg-primary transition-transform duration-300"
+                        style={{
+                          transform: `scaleY(${entry.size > 0 ? entry.uploadedBytes / entry.size : 0})`,
+                        }}
+                      />
+                    </div>
                     {(entry.status === "pending" ||
                       entry.status === "retrying") && (
                       <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-muted-foreground" />
@@ -623,6 +692,9 @@ export function GalleryPage() {
                     )}
                     <div className="min-w-0">
                       <p className="truncate font-medium">{entry.name}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {formatSizeProgress(entry.uploadedBytes, entry.size)}
+                      </p>
                       {entry.error && (
                         <p
                           className={`text-xs ${entry.status === "retrying" ? "text-muted-foreground" : "text-red-500"}`}
