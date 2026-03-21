@@ -341,7 +341,9 @@ export function FoldersList({
                             name={folder.name ?? ""}
                             mimeType="image/"
                             fitType="cover"
-                            maxWidth={300}
+                            maxWidth={640}
+                            lowResSize={64}
+                            lowResBlurClassName="blur-0"
                           />
                           <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/50 via-black/10 to-transparent transition-opacity duration-300 group-hover:opacity-90" />
                           <div className="pointer-events-none absolute inset-0 bg-linear-to-br from-white/20 via-transparent to-transparent" />

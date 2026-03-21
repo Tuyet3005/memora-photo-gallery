@@ -21,7 +21,7 @@ export default function Header() {
         >
           <img src="/favicon.ico" alt="Memora" className="h-10" />
           <div className="flex min-w-0 flex-col items-start overflow-hidden text-left leading-none">
-            <span className="block w-full truncate font-bold text-(--sea-ink) text-lg tracking-tight">
+            <span className="block w-full truncate bg-gradient-to-r from-pink-300 via-purple-300 to-blue-300 bg-clip-text text-lg text-transparent tracking-tight drop-shadow-[0_2px_2px_rgba(244,194,231,0.3)]">
               Memora
             </span>
             <span className="block w-full truncate font-medium text-[10px] text-muted-foreground uppercase tracking-widest">

@@ -40,13 +40,6 @@ import {
   DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
 import { Input } from "#/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "#/components/ui/select";
 import { Textarea } from "#/components/ui/textarea";
 import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
@@ -235,6 +228,7 @@ export function GalleryPage() {
     useState<boolean>(false);
   const [setCreationDateDialogOpen, setSetCreationDateDialogOpen] =
     useState<boolean>(false);
+  const [delegationDialogOpen, setDelegationDialogOpen] = useState(false);
   const [selectedFolderForDateEdit, setSelectedFolderForDateEdit] = useState<{
     id: string;
     name: string;
@@ -617,7 +611,220 @@ export function GalleryPage() {
 
   return (
     <>
-      <main className="mx-auto max-w-6xl px-8 py-4 sm:px-10">
+      <main className="mx-auto max-w-6xl px-8 py-4 pb-24 sm:px-10">
+        {/* Fixed Buttons at Bottom Navigation */}
+        <div className="fixed right-0 bottom-0 left-0 z-40 flex items-center justify-center gap-3 border-gray-200 border-t bg-white/95 px-4 py-3 backdrop-blur-sm sm:gap-4 sm:py-4">
+          {/* Left Side: Avatar and Edit */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            {grantorData && grantorData.grantors.length > 0 && (
+              <>
+                <div className="flex flex-col items-center gap-1">
+                  <Button
+                    size="sm"
+                    className="flex h-10 w-10 items-center justify-center rounded-full border-0 bg-transparent p-0 shadow-lg transition-all duration-300 hover:scale-110 hover:bg-transparent hover:shadow-xl"
+                    onClick={() => setDelegationDialogOpen(true)}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage
+                        src={
+                          selectedDelegationId === null
+                            ? (session?.user.image ?? undefined)
+                            : (grantorData.grantors.find(
+                                (x) => x.delegationId === selectedDelegationId,
+                              )?.grantorImage ?? undefined)
+                        }
+                        alt=""
+                      />
+                      <AvatarFallback className="bg-gradient-to-br from-pink-200 to-purple-200 font-semibold text-gray-700 text-sm">
+                        {selectedDelegationId === null
+                          ? (session?.user.name ?? "Me").charAt(0).toUpperCase()
+                          : (grantorData.grantors
+                              .find(
+                                (x) => x.delegationId === selectedDelegationId,
+                              )
+                              ?.grantorName.charAt(0)
+                              .toUpperCase() ?? "U")}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                  <span className="text-gray-600 text-xs">Account</span>
+                </div>
+                <Dialog
+                  open={delegationDialogOpen}
+                  onOpenChange={setDelegationDialogOpen}
+                >
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Switch Account</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDelegationId(null);
+                          setPreference.mutate({ delegationId: null });
+                          setDelegationDialogOpen(false);
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-lg px-4 py-2 text-left transition-colors ${
+                          selectedDelegationId === null
+                            ? "bg-blue-100 text-blue-900"
+                            : "hover:bg-gray-100"
+                        }`}
+                      >
+                        <AccountOption
+                          image={session?.user.image}
+                          name={session?.user.name ?? "Me"}
+                        />
+                      </button>
+                      {grantorData.grantors.map((g) => (
+                        <button
+                          type="button"
+                          key={g.delegationId}
+                          onClick={() => {
+                            setSelectedDelegationId(g.delegationId);
+                            setPreference.mutate({
+                              delegationId: g.delegationId,
+                            });
+                            setDelegationDialogOpen(false);
+                          }}
+                          className={`flex w-full items-center gap-3 rounded-lg px-4 py-2 text-left transition-colors ${
+                            selectedDelegationId === g.delegationId
+                              ? "bg-blue-100 text-blue-900"
+                              : "hover:bg-gray-100"
+                          }`}
+                        >
+                          <AccountOption
+                            image={g.grantorImage}
+                            name={g.grantorName}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
+            {currentFolderId && !isMemoraFolder && (
+              <div className="flex flex-col items-center gap-1">
+                <Button
+                  size="sm"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-cyan-300 to-teal-400 p-0 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                  disabled={isMemoraFolder}
+                  onClick={() => {
+                    setSelectedFolderForDateEdit({
+                      id: currentFolderId,
+                      name: currentFolder?.name || "Folder",
+                    });
+                    setSetCreationDateDialogOpen(true);
+                  }}
+                >
+                  <Edit3 className="size-4" />
+                </Button>
+                <span className="text-gray-600 text-xs">Edit date</span>
+              </div>
+            )}
+          </div>
+
+          {/* Center: Add Button */}
+          <DropdownMenu>
+            <div className="flex flex-col items-center gap-1">
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 p-0 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                >
+                  <Plus className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <span className="text-gray-600 text-xs">Add</span>
+            </div>
+            <DropdownMenuContent align="center">
+              {isDelegatedAtRoot ? (
+                <DropdownMenuItem
+                  disabled
+                  title="You must upload to a folder when using delegation"
+                >
+                  <Upload />
+                  Upload files
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                  <Upload />
+                  Upload files
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={() => {
+                  setNewFolderName("");
+                  setNewFolderDialogOpen(true);
+                }}
+              >
+                <FolderPlus />
+                New folder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Refresh Buttons */}
+          {currentFolderId && (
+            <>
+              <div className="flex flex-col items-center gap-1">
+                <Button
+                  size="sm"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-300 to-cyan-400 p-0 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                  onClick={() => {
+                    setFoldersRefreshToken((value) => value + 1);
+                    queryClient.resetQueries({
+                      queryKey: trpc.drive.listMedia.infiniteQueryKey({
+                        folderId: currentFolderId,
+                      }),
+                    });
+                  }}
+                >
+                  <RefreshCw className="size-4" />
+                </Button>
+                <span className="text-gray-600 text-xs">Refresh</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-1">
+                <Button
+                  size="sm"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-purple-300 to-indigo-400 p-0 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                  disabled={isRefreshingFolderDates}
+                  onClick={() =>
+                    setRefreshFolderDatesToken((value) => value + 1)
+                  }
+                >
+                  {isRefreshingFolderDates ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RotateCw className="size-4" />
+                  )}
+                </Button>
+                <span className="text-gray-600 text-xs">Dates</span>
+              </div>
+            </>
+          )}
+
+          {/* Right Side: Share */}
+          {currentFolderId && (
+            <div className="flex flex-col items-center gap-1">
+              <Button
+                size="sm"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-amber-300 to-orange-400 p-0 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:shadow-xl"
+                disabled={createFolderShare.isPending}
+                onClick={handleShare}
+              >
+                {createFolderShare.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Share2 className="size-4" />
+                )}
+              </Button>
+              <span className="text-gray-600 text-xs">Share</span>
+            </div>
+          )}
+        </div>
         <input
           ref={fileInputRef}
           type="file"
@@ -808,7 +1015,7 @@ export function GalleryPage() {
                   <BreadcrumbItem>
                     {isLast ? (
                       <div className="flex items-center gap-1.5">
-                        <BreadcrumbPage className="font-bold text-(--sea-ink) text-2xl leading-tight sm:text-3xl sm:leading-normal">
+                        <BreadcrumbPage className="bg-gradient-to-r from-pink-300 via-purple-300 to-blue-300 bg-clip-text text-2xl text-transparent leading-tight drop-shadow-[0_3px_3px_rgba(244,194,231,0.4)] sm:text-3xl sm:leading-normal">
                           {folder.name}
                         </BreadcrumbPage>
                         {folder.id &&
@@ -828,7 +1035,7 @@ export function GalleryPage() {
                       </div>
                     ) : (
                       <BreadcrumbLink
-                        className="cursor-pointer font-bold text-2xl leading-tight sm:text-3xl sm:leading-normal"
+                        className="cursor-pointer bg-gradient-to-r from-pink-300 via-purple-300 to-blue-300 bg-clip-text text-2xl text-transparent leading-tight drop-shadow-[0_3px_3px_rgba(244,194,231,0.4)] sm:text-3xl sm:leading-normal"
                         onClick={() => {
                           if (!confirmNavigationDuringUpload()) return;
                           const newStack = folderStack.slice(0, stackIdx + 1);
@@ -901,7 +1108,7 @@ export function GalleryPage() {
             <Button
               variant="outline"
               size="sm"
-              className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
+              className="hidden w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
               tooltip="Reload folders and media in the current folder."
               onClick={() => {
                 setFoldersRefreshToken((value) => value + 1);
@@ -918,7 +1125,7 @@ export function GalleryPage() {
             <Button
               variant="outline"
               size="sm"
-              className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
+              className="hidden w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
               disabled={isRefreshingFolderDates}
               tooltip="Re-fetch creation dates for all folders in this folder."
               onClick={() => setRefreshFolderDatesToken((value) => value + 1)}
@@ -934,7 +1141,7 @@ export function GalleryPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
+                className="hidden"
                 disabled={isMemoraFolder}
                 tooltip={
                   isMemoraFolder
@@ -958,7 +1165,7 @@ export function GalleryPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3"
+                className="hidden"
                 disabled={createFolderShare.isPending}
                 onClick={handleShare}
                 tooltip="Create and copy a share link for this folder."
@@ -1017,66 +1224,14 @@ export function GalleryPage() {
                 <span className="min-w-0 truncate">Set home folder</span>
               </Button>
             )}
-            {grantorData && grantorData.grantors.length > 0 && (
-              <Select
-                value={selectedDelegationId ?? "me"}
-                onValueChange={(val) => {
-                  const newId = val === "me" ? null : val;
-                  setSelectedDelegationId(newId);
-                  setPreference.mutate({ delegationId: newId });
-                }}
-              >
-                <SelectTrigger
-                  size="sm"
-                  className="w-full min-w-0 justify-start"
-                >
-                  {selectedDelegationId === null ? (
-                    <AccountOption
-                      image={session?.user.image}
-                      name={session?.user.name ?? "Me"}
-                    />
-                  ) : (
-                    (() => {
-                      const g = grantorData.grantors.find(
-                        (x) => x.delegationId === selectedDelegationId,
-                      );
-                      return g ? (
-                        <AccountOption
-                          image={g.grantorImage}
-                          name={g.grantorName}
-                        />
-                      ) : (
-                        <SelectValue placeholder="Upload as…" />
-                      );
-                    })()
-                  )}
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectItem value="me">
-                    <AccountOption
-                      image={session?.user.image}
-                      name={session?.user.name ?? "Me"}
-                    />
-                  </SelectItem>
-                  {grantorData.grantors.map((g) => (
-                    <SelectItem key={g.delegationId} value={g.delegationId}>
-                      <AccountOption
-                        image={g.grantorImage}
-                        name={g.grantorName}
-                      />
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
             <DropdownMenu>
               <span className="w-full">
-                <DropdownMenuTrigger data-size="sm" className="w-full min-w-0">
+                <DropdownMenuTrigger data-size="sm" className="hidden">
                   <Plus className="size-4 shrink-0" />
-                  <span className="min-w-0 truncate">Add</span>
+                  <span className="hidden min-w-0 truncate">Add</span>
                 </DropdownMenuTrigger>
               </span>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="hidden">
                 {isDelegatedAtRoot ? (
                   <DropdownMenuItem
                     disabled

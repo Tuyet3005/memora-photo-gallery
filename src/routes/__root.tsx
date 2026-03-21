@@ -10,6 +10,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import type { TRPCOptionsProxy } from "@trpc/tanstack-react-query";
 import type { PostHogConfig } from "posthog-js";
 import type { TRPCRouter } from "#/integrations/trpc/router";
+import GoToTopButton from "../components/GoToTopButton";
 import Header from "../components/Header";
 import { Toaster } from "../components/ui/sonner";
 import { TooltipProvider } from "../components/ui/tooltip";
@@ -83,18 +84,21 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               <TooltipProvider>
                 <Header />
                 {children}
-                <TanStackDevtools
-                  config={{
-                    position: "bottom-right",
-                  }}
-                  plugins={[
-                    {
-                      name: "Tanstack Router",
-                      render: <TanStackRouterDevtoolsPanel />,
-                    },
-                    TanStackQueryDevtools,
-                  ]}
-                />
+                <GoToTopButton />
+                {import.meta.env.VITE_SHOW_TANSTACK_DEBUG && (
+                  <TanStackDevtools
+                    config={{
+                      position: "bottom-right",
+                    }}
+                    plugins={[
+                      {
+                        name: "Tanstack Router",
+                        render: <TanStackRouterDevtoolsPanel />,
+                      },
+                      TanStackQueryDevtools,
+                    ]}
+                  />
+                )}
               </TooltipProvider>
             </TanStackQueryProvider>
           </ErrorBoundary>

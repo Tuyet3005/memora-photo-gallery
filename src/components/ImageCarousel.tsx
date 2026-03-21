@@ -3,7 +3,7 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Loader2, RotateCcw, Star } from "lucide-react";
+import { Download, Loader2, RotateCcw, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import {
@@ -400,6 +400,26 @@ export function ImageCarousel({
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
+                    {!file.mimeType?.startsWith("video/") && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="border border-white/15 bg-black/65 text-white backdrop-blur-md hover:bg-black/80 hover:text-white"
+                        onClick={() => {
+                          // Use Google Drive direct download URL with file ID
+                          const downloadUrl = `https://drive.google.com/uc?export=download&id=${file.id}`;
+                          const link = document.createElement("a");
+                          link.href = downloadUrl;
+                          link.download = file.name || "image";
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        aria-label="Download image"
+                      >
+                        <Download className="size-5" />
+                      </Button>
+                    )}
                     {!file.mimeType?.startsWith("video/") && (
                       <Button
                         size="icon"

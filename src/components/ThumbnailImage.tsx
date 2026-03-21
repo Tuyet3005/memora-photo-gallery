@@ -18,6 +18,9 @@ export function ThumbnailImage({
   rounded = false,
   showBlurBackdrop = false,
   blurBackdropSize,
+  lowResSize = 10,
+  lowResBlurClassName = "blur-xs",
+  fullImageClassName,
 }: {
   thumbnailLink: string;
   name: string;
@@ -28,6 +31,9 @@ export function ThumbnailImage({
   rounded?: boolean;
   showBlurBackdrop?: boolean;
   blurBackdropSize?: number;
+  lowResSize?: number;
+  lowResBlurClassName?: string;
+  fullImageClassName?: string;
 }) {
   const [fullStarted, setFullStarted] = useState(false);
   const [fullLoaded, setFullLoaded] = useState(false);
@@ -80,14 +86,15 @@ export function ThumbnailImage({
       )}
       {!fullLoaded && (
         <img
-          src={lh3Src(thumbnailLink, 10)}
+          src={lh3Src(thumbnailLink, lowResSize)}
           alt={name}
           style={rotateStyle}
           className={cn(
             "absolute inset-0 z-10 size-full select-none",
             rounded && "rounded-lg",
             objectFitClass,
-            "object-center blur-xs duration-300",
+            "object-center duration-300",
+            lowResBlurClassName,
             lowLoaded ? "opacity-100" : "opacity-0",
           )}
           referrerPolicy="no-referrer"
@@ -108,6 +115,7 @@ export function ThumbnailImage({
             rounded && "rounded-lg",
             objectFitClass,
             "object-center",
+            fullImageClassName,
             fullLoaded ? "opacity-100" : "opacity-0",
           )}
           referrerPolicy="no-referrer"
