@@ -108,13 +108,6 @@ export async function initResumableUpload({
     matchedExistingId = existing.data.files?.[0]?.id ?? null;
   }
 
-  // When replacing an existing file, clear the cached original-version row.
-  if (matchedExistingId) {
-    await db
-      .delete(imageOriginalVersion)
-      .where(eq(imageOriginalVersion.fileId, matchedExistingId));
-  }
-
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
@@ -145,6 +138,13 @@ export async function initResumableUpload({
   const location = resp.headers.get("Location");
   if (!location) {
     throw new Error("No resumable upload URI returned by Google Drive.");
+  }
+
+  // When replacing an existing file, clear the cached original-version row.
+  if (matchedExistingId) {
+    await db
+      .delete(imageOriginalVersion)
+      .where(eq(imageOriginalVersion.fileId, matchedExistingId));
   }
 
   return location;
