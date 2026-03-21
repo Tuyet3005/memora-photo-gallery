@@ -3,6 +3,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   CheckCircle2,
   Edit3,
+  ExternalLink,
   FolderPlus,
   Home,
   Loader2,
@@ -24,7 +25,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "#/components/ui/breadcrumb";
-import { Button } from "#/components/ui/button";
+import { Button, buttonVariants } from "#/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,7 @@ import { useTRPC } from "#/integrations/trpc/react";
 import { authClient } from "#/lib/auth-client";
 import { NOTE_EDITOR_EMAILS } from "#/lib/constants";
 import {
+  cn,
   formatDuration,
   formatSizeProgress,
   sleep,
@@ -217,6 +219,17 @@ export function GalleryPage() {
   const currentFolder = folderStack.at(-1);
   // Pass undefined for root (empty id = Your gallery)
   const currentFolderId = currentFolder?.id || undefined;
+  const driveFolderUrl = useMemo(() => {
+    if (!currentFolderId) return null;
+
+    const url = new URL(
+      `https://drive.google.com/drive/folders/${currentFolderId}`,
+    );
+    if (session?.user.email) {
+      url.searchParams.set("authuser", session.user.email);
+    }
+    return url.toString();
+  }, [currentFolderId, session?.user.email]);
 
   const [isRefreshingFolderDates, setIsRefreshingFolderDates] =
     useState<boolean>(false);
@@ -957,6 +970,20 @@ export function GalleryPage() {
                 )}
                 <span className="min-w-0 truncate">Share</span>
               </Button>
+            )}
+            {driveFolderUrl && (
+              <a
+                href={driveFolderUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "w-full min-w-0 justify-start gap-1 px-2 lg:gap-1.5 lg:px-3",
+                )}
+              >
+                <ExternalLink className="size-4 shrink-0" />
+                <span className="min-w-0 truncate">Open in Drive</span>
+              </a>
             )}
             {preferences !== undefined && (
               <Button

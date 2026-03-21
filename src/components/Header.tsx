@@ -13,7 +13,7 @@ export default function Header() {
           onClick={() => {
             navigate({
               to: "/",
-              search: { folder: undefined, name: undefined, root: true },
+              search: {},
               replace: false,
             });
           }}
