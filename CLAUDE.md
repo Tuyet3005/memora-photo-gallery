@@ -7,3 +7,4 @@
 - Add comments to new procedures, and update those comments whenever the procedures are modified.
 - When the user tells you something important or useful, store it in this file so that you can refer back to it later when needed. This file serves as a knowledge base for important information about the project, so make sure to keep it updated with any new insights or details that may be helpful in the future.
 - When the user asks you to do something, always ask for clarification if the request is not clear or if you need more information to complete the task. This will help ensure that you understand the user's needs and can provide the best possible results.
+- Record only important changes in this file; avoid logging every small edit.
